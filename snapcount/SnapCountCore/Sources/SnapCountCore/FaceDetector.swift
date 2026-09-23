@@ -8,8 +8,9 @@ import Vision
 /// nothing leaves the process.
 ///
 /// Alignment is done with a similarity transform that maps the two detected eye centers onto
-/// the canonical ArcFace reference positions. That is the preprocessing MobileFaceNet-family
-/// models are trained with, so matching it is worth real accuracy. It also avoids depending on
+/// the canonical ArcFace reference positions. That is the preprocessing the whole ArcFace-
+/// convention family is trained with, AdaFace included, so matching it is worth real accuracy.
+/// It also avoids depending on
 /// Vision's `roll` sign convention, which is not documented clearly enough to trust blind.
 public struct FaceDetector: Sendable {
 
@@ -34,7 +35,8 @@ public struct FaceDetector: Sendable {
     /// Padding beyond Vision's tight box, used only by the unaligned fallback path.
     public var cropPadding: CGFloat
 
-    /// Edge length of the square crop handed to the embedder. 112 is the MobileFaceNet input size.
+    /// Edge length of the square crop handed to the embedder. 112 is the input size shared by
+    /// the ArcFace-convention models: MobileFaceNet, ArcFace, and AdaFace.
     public var outputSize: Int
 
     public init(

@@ -1,5 +1,16 @@
 # Device Access Toolkit (Native)
 
+> **Partly superseded (2026-09-22).** Two corrections below, verified against the 0.9 API
+> reference and the SDK repo's `AGENTS.md`. Current detail lives in
+> `../snapcount/research/dat-api-findings.md` and `../snapcount/docs/info-plist.md`.
+>
+> 1. **`UIBackgroundModes` is `bluetooth-peripheral` + `external-accessory`, NOT
+>    `bluetooth-central`** as stated further down. Also missing here:
+>    `UISupportedExternalAccessoryProtocols` = `com.meta.ar.wearable`, and `OptOut`.
+> 2. **The microphone claim below is unverified.** The 0.9 `Permission` enum has exactly one
+>    case, `.camera`. Audio may be unexposed, or ungated. Treat "microphone input, audio
+>    output" as marketing copy that was never confirmed against the API.
+
 Current version at time of research: **0.9.0**, developer preview.
 
 Repos:
@@ -41,6 +52,8 @@ TestFlight, no store listing needed for personal development.
 - `APPLICATION_ID`
 - `CLIENT_TOKEN`
 - Permissions: `BLUETOOTH`, `BLUETOOTH_CONNECT`, `INTERNET`
+
+(iOS keys in this file are incomplete and partly wrong; see the banner at the top.)
 
 ## Registration vs permissions: two separate things
 

@@ -35,25 +35,20 @@ is invisible, and it removes all latency pressure from the camera pipeline.
 |---|---|---|
 | SDK path | Device Access Toolkit (native) | Only path with camera. Works offline. |
 | Face detection | Apple Vision | Free, on-device, no model to ship |
-| Face identity | MobileFaceNet / ArcFace via Core ML | No Apple identity API exists; feature prints are too weak for children |
+| Face identity | **AdaFace IR-18** via Core ML | No Apple identity API exists; feature prints are too weak for children. AdaFace beats ArcFace on mixed-quality images, which is what candid shots of a moving child are. |
 | Glasses HUD | Text and icons only, no images | `Image` loads from URL; avoiding it keeps everything local |
 | Meta telemetry | Off | `OptOut = true`, plus crash reporting |
 | Photo storage | App container, excluded from backup | Keeps biometric data out of iCloud |
 
 ## Build order
 
-The face recognition is the **known** quantity. The 0.9 preview SDK is the **unknown** one.
-So the recognition pipeline gets built first, as a plain iOS app testable at a desk with no
-glasses and no Developer Center. The glasses bolt on last as a display and trigger layer.
+**See [`../WORKPLAN.md`](../WORKPLAN.md) for the authoritative phase list, current status, and
+acceptance criteria.** It is not duplicated here, so the two cannot drift apart.
 
-If DAT falls through, this still lands as a working phone app.
-
-1. **Recognition core** - Vision detect, Core ML embed, match, count. Simulator-testable.
-2. **Enrollment UI** - pick reference photos, compute and store the mean embedding.
-3. **Review screen** - see matches, correct mistakes, tune the threshold against real data.
-4. **DAT integration** - session, camera permission, photo capture.
-5. **Glasses HUD** - FlexBox + Text, push count on change.
-6. **Hardening** - airplane-mode test, egress proxy test, battery measurement.
+The sequencing principle, which will not change: the face recognition is the **known**
+quantity and the 0.9 preview SDK is the **unknown** one. So the recognition pipeline is built
+first, as a plain iOS app testable at a desk with no glasses. The glasses bolt on last as a
+display and trigger layer. If DAT falls through, this still lands as a working phone app.
 
 Steps 1-3 need nothing from Meta. Step 4 is blocked on a Developer Center project.
 
@@ -96,8 +91,8 @@ embedding without ever failing visibly.
 Crops are aligned by mapping the two detected eye centres onto the canonical ArcFace
 reference positions with a similarity transform. Two reasons:
 
-1. It is the preprocessing MobileFaceNet-family models are trained with, so matching it is
-   worth real accuracy.
+1. It is the standard ArcFace-convention preprocessing that MobileFaceNet, ArcFace, and
+   AdaFace are all trained with, so matching it is worth real accuracy.
 2. It avoids depending on Vision's `roll` sign convention, which is not documented clearly
    enough to trust without a real rotated face to test against.
 

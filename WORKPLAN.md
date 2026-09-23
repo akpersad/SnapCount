@@ -4,7 +4,7 @@
 immediately. Read this first; it should make re-reading the research files unnecessary for
 most tasks.
 
-Last updated: 2026-09-22
+Last updated: 2026-09-22 (documentation audit: 15 contradictions reconciled across 16 files)
 
 ---
 
@@ -60,7 +60,7 @@ Recorded so they are not re-litigated. Each has a reason; revisit only if the re
 | Manual capture via glasses button tap | Predictable battery, no surprise captures of other people's children, and matches the confirmed `Button` tap-handler API. |
 | Push both count accuracy and glasses HUD | User chose not to compromise on either. |
 | Apple Vision for detection | Free, on-device, Neural Engine, no model to ship. |
-| MobileFaceNet/ArcFace via Core ML for identity | No Apple face-identity API exists. Vision feature prints are too weak to separate one young child from another. |
+| **AdaFace IR-18** via Core ML for identity | No Apple face-identity API exists. Vision feature prints are too weak to separate one young child from another. AdaFace's quality-adaptive margin beats ArcFace by ~11% on mixed-quality images, which is exactly what candid shots of a moving child are. |
 | Align crops on eye landmarks, not Vision `roll` | Matches the model's expected preprocessing, and avoids Vision's undocumented roll sign convention. |
 | Glasses HUD is text and icons only | The `Image` component loads from a URL, which would mean running a local HTTP server. |
 | Recognition runs async, off the capture path | A few seconds of lag is invisible and it removes all latency pressure from the camera pipeline. |
@@ -87,7 +87,8 @@ Researched and confirmed. Do not re-derive.
 
 ### SDK surface
 - Modules: `MWDATCore`, `MWDATCamera`, `MWDATDisplay`, `MWDATMockDevice`
-- `Permission` enum has exactly **one** case: `.camera`
+- `Permission` enum has exactly **one** case: `.camera`. Earlier research claiming microphone
+  access is **unverified** and may be marketing copy. Irrelevant here; `snapcount` needs no audio.
 - Display components: `FlexBox`, `Text`, `Image`, `Button`, `ButtonGroup`, `Icon`,
   `VideoPlayer`. Full view re-sent on every update; no partial updates.
 - `MetaAppID` can be **`0`** in developer mode
@@ -121,8 +122,8 @@ Team ID, Bundle ID `com.akpersad.snapcount`, and Universal link `snapcount://` s
 `MetaAppID` and `ClientToken` are in `snapcount/Secrets.xcconfig` (gitignored, verified absent
 from all commits).
 
-**Outstanding:** confirm the **Camera access** toggle is on with a rationale. If the runtime
-permission prompt never fires in Phase 5, this is the first thing to check.
+**Camera access** toggle is on with a rationale. Phase 0 is fully complete; Phase 5 is
+unblocked on the Meta side.
 
 ---
 
@@ -149,10 +150,12 @@ swift test  --package-path snapcount/SnapCountCore
 
 ### Phase 2: Model and enrollment  [NEXT, unblocked except for photos]
 
-- [ ] **2a. Source a MobileFaceNet Core ML model.** Try a pre-converted `.mlpackage` first.
-      Fall back to ONNX + coremltools in a Python 3.11/3.12 venv.
-      *Acceptance:* `CoreMLFaceEmbedder` returns a 512-d embedding for a test crop; two photos
-      of the same person score higher than two of different people.
+- [ ] **2a. Fetch and wire the AdaFace IR-18 Core ML model.** Pre-converted, so no
+      coremltools and no Python venv needed. Run `snapcount/Scripts/fetch-model.sh`.
+      Then inspect the `.mlpackage` for its real input and output feature names and pass them
+      to `CoreMLFaceEmbedder`; they are currently unknown.
+      *Acceptance:* `CoreMLFaceEmbedder` returns a 512-d embedding for a test crop, and two
+      photos of the same person score higher than two photos of different people.
 - [ ] **2b. Enrollment CLI or test harness.** Read `ReferencePhotos/daughter/`, build the
       centroid, write `enrollment.json`.
       *Acceptance:* enrollment.json exists with `sampleCount` >= 10.
@@ -189,7 +192,7 @@ library.
 
 ---
 
-### Phase 5: DAT integration  [BLOCKED ON PHASE 0]
+### Phase 5: DAT integration  [UNBLOCKED]
 
 - [ ] **5a.** `Wearables.configure()`, `startRegistration()`, `.onOpenURL` callback handling.
 - [ ] **5b.** Request `.camera` permission; build and test the denied path.
@@ -229,7 +232,9 @@ library.
 | # | Question | How to resolve | Blocks |
 |---|---|---|---|
 | 1 | ~~Universal link vs custom URL scheme?~~ **RESOLVED.** The field accepted `snapcount://`, so no hosted `apple-app-site-association` is needed. | Done | none |
-| 2 | Does camera permission work with `MetaAppID = 0`? | Empirical. If the prompt never fires, the permission is probably not declared on the project. | Phase 5 |
+| 2 | ~~Does camera permission work with `MetaAppID = 0`?~~ **MOOT.** A real `MetaAppID` was issued and camera permission is declared and toggled on. | Done | none |
+| 6 | What are AdaFace IR-18's Core ML input/output feature names, and does it expect 0-1 or -1..1 normalization? | Inspect the `.mlpackage` after fetching. Wrong normalization produces plausible-looking but useless embeddings, so verify with a same-person vs different-person sanity check. | Phase 2a |
+| 7 | Pretrained-weight licensing. The AdaFace repo is MIT, but the weights derive from datasets with research-use restrictions. | Fine for a personal, undistributed app. Needs a real answer before any release. Distribution is closed during the preview anyway. | Distribution only |
 | 3 | Does photo capture require a running stream? | Read the 0.9 reference or test. Determines whether all-day capture is battery-viable. | Phase 6 |
 | 4 | Are raw swipe/pinch events exposed, or only `Button` taps? | Button taps are sufficient, so this is informational. | none |
 | 5 | Is text input available on device? | Not needed by this app. | none |
@@ -272,6 +277,7 @@ After saving, the page issues `MetaAppID` and `ClientToken`. Put both in
 4. Remember the `cd` gotcha in section 4.
 
 Deeper detail, only if needed:
+- `snapcount/Scripts/fetch-model.sh` - downloads AdaFace IR-18 (gitignored, not committed)
 - `snapcount/docs/info-plist.md` - **the paste-ready Info.plist**
 - `snapcount/docs/setup-walkthrough.md` - Developer Center specifics
 - `snapcount/docs/privacy-architecture.md` - the no-egress checklist

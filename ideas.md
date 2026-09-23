@@ -1,6 +1,12 @@
 # App Ideas
 
-Placeholder. Brainstorm deferred to a later session by request.
+> **Historical.** The brainstorm happened and the idea is decided: an on-device face-count
+> app, now being built in `snapcount/`. See `WORKPLAN.md`.
+>
+> Caveat if you read on: the "design constraints" below were derived from **Web Apps**
+> research and were written before the native path's API was verified. Two do not hold for
+> the native path as built. Input is `Button` tap handlers rather than a raw d-pad, and text
+> entry is irrelevant since `snapcount` needs none.
 
 ## Design constraints any idea has to survive
 

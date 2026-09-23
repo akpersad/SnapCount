@@ -31,6 +31,8 @@ Secrets.xcconfig
 .swiftpm/
 DerivedData/
 *.xcuserstate
+# Core ML models are fetched, not committed. See snapcount/Scripts/fetch-model.sh
 *.mlmodel
 *.mlpackage
+snapcount/Models/
 .DS_Store

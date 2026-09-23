@@ -2,6 +2,9 @@
 
 Research and prototyping space for building on Meta Ray-Ban Display glasses.
 
+> **Start at [`WORKPLAN.md`](WORKPLAN.md).** That is the single source of truth for status,
+> decisions, and next steps. The files below are background research, some of it superseded.
+
 Hardware on hand: Meta Ray-Ban Display + Meta Neural Band. Meta developer account exists.
 
 ## Status
@@ -10,28 +13,34 @@ Hardware on hand: Meta Ray-Ban Display + Meta Neural Band. Meta developer accoun
 |---|---|
 | Meta developer account | Done |
 | Developer Mode in Meta AI app | Enabled (2026-09-03) |
-| Wearables Developer Center org | Not created yet |
-| Wearables Developer Center project | Not created yet (intentionally deferred) |
+| Wearables Developer Center org | Done |
+| Wearables Developer Center project | Done. Configured, camera permission on |
 | Chosen build path | Device Access Toolkit (native) |
 | App idea | DECIDED: on-device face-count app, see `snapcount/` |
 
 ## Direction
 
 Going the **native Device Access Toolkit** route rather than Web Apps. Reason: more control over
-actual hardware. It is the only path with camera and microphone access, and it supports the whole
-glasses lineup instead of Display only.
+actual hardware. It is the only path with camera access, and it supports the whole glasses
+lineup instead of Display only.
+
+**Correction (2026-09-22):** earlier notes here claimed microphone access too. That is now
+contested. The 0.9 `Permission` enum has exactly one case, `.camera`. See the microphone note
+in `research/device-access-toolkit.md`. It does not affect `snapcount`, which needs no audio.
 
 Web Apps research is retained in `research/web-apps.md` as a fallback and for comparison.
 
 ## Contents
 
+- **`WORKPLAN.md` - start here. Status, decisions, phases, open questions.**
+- **`snapcount/` - the actual project.** Recognition core, docs, and setup.
 - `research/build-paths.md` - the two SDK paths, side by side comparison
 - `research/device-access-toolkit.md` - native path: capabilities, config keys, registration model
 - `research/web-apps.md` - web path: 600x600 constraints, d-pad input, available APIs
 - `research/setup-developer-mode.md` - version requirements, Developer Mode steps, troubleshooting
 - `research/constraints-and-limits.md` - hard blockers, preview-status caveats, gotchas
 - `research/sources.md` - every URL consulted
-- `ideas.md` - app idea brainstorm (placeholder, to be filled in a later session)
+- `ideas.md` - historical brainstorm. Superseded; the app idea is decided.
 
 ## Open questions
 

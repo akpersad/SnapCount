@@ -25,13 +25,36 @@ on them. Cheap accuracy win.
 
 ## Layer 2: identity (Core ML)
 
-### Chosen: MobileFaceNet trained with ArcFace loss
+### Chosen: AdaFace IR-18
 
-- Input: 112x112 normalized RGB
+Changed from MobileFaceNet on 2026-09-22, after finding a pre-converted Core ML build.
+
+- Input: 112x112 RGB, ArcFace-convention 5-point alignment (which `FaceDetector` already does)
 - Output: 512-dimensional embedding
-- Size: roughly 5 MB
-- Compare with cosine similarity, threshold around 0.6-0.7, tuned on real data
+- Compare with cosine similarity, threshold tuned on real data
 - Runs on the Neural Engine
+
+**Why AdaFace over ArcFace/MobileFaceNet.** AdaFace (CVPR 2022) uses a quality-adaptive
+margin: it weights training emphasis by image quality, de-emphasising unidentifiable samples
+instead of letting them drag the model. On mixed-quality benchmarks (IJB-B, IJB-C) it cuts
+error 11% and 9% against the next best method.
+
+That is directly on point. Candid photographs of a moving child, half of them captured from
+glasses over a compressed Bluetooth link, are a mixed-quality set almost by definition. This
+is the failure mode we are most exposed to.
+
+**The tradeoff: size.** IR-18 is a ResNet-18 backbone, 44.5 MB zipped, versus roughly 5 MB for
+MobileFaceNet. Irrelevant for a personally sideloaded developer-mode app. If size ever
+mattered, MobileFaceNet remains the fallback and the pipeline needs no changes to swap it,
+since `FaceEmbedder` is a protocol and `Enrollment` records which embedder built it.
+
+Source: `john-rocky/CoreML-Models`, release `adaface-v1`, asset `AdaFace_IR18.mlpackage.zip`.
+Fetch with `snapcount/Scripts/fetch-model.sh`. The model is gitignored, not committed.
+
+**Licensing is an open item.** The AdaFace repo is MIT, but pretrained weights derive from
+datasets (MS1MV2, WebFace4M and similar) that carry research-use restrictions of their own.
+For a personal app that is never distributed, and which cannot be distributed anyway while
+Meta's publishing is closed, this is fine. It would need a real answer before any release.
 
 Enroll with 10-20 photos across angles and lighting, store the mean embedding (L2-normalized).
 

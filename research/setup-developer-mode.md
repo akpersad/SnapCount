@@ -2,9 +2,13 @@
 
 ## Version requirements
 
+> **These are floors, not pins.** Confirmed by the "Min firmware" column in the table below.
+> Actual device state as of 2026-09-22: **glasses V128, Meta AI app 289.0.0.21.157.** Both
+> clear their floors. DAT 0.9.0 is the newest tag; no 1.0 exists.
+
 For the current SDK (**DAT 0.9.0**):
-- Meta AI app: **V282**
-- Glasses firmware: **V125 to V126** depending on model
+- Meta AI app: **V282** minimum
+- Glasses firmware: **V125** minimum for Ray-Ban Display, **V126** for the other models
 
 Absolute floors per device (pins you to older DAT versions, not recommended):
 

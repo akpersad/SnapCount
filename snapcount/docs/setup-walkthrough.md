@@ -2,7 +2,14 @@
 
 Verified against Meta's docs and the SDK repo's `AGENTS.md` on 2026-09-22.
 
-## The headline: you may not need a Developer Center project at all
+> **Status: this is now history.** The Developer Center project was created and configured on
+> 2026-09-22. A real `MetaAppID` and `ClientToken` are in `snapcount/Secrets.xcconfig`, the
+> Universal link is `snapcount://`, and camera permission is toggled on.
+>
+> **For the values to actually use, see [`info-plist.md`](info-plist.md).** Everything below
+> is kept only to explain how we got here and as a fallback if credentials need regenerating.
+
+## Historical: you may not have needed a Developer Center project at all
 
 `AGENTS.md` in `facebook/meta-wearables-dat-ios` states that **`MetaAppID` can be `0` in
 developer mode**. A production ID from Wearables Developer Center is only needed for
@@ -80,7 +87,7 @@ Inside an `MWDAT` dictionary:
 
 | Key | Value |
 |---|---|
-| `AppLinkURLScheme` | `snapcount` |
+| `AppLinkURLScheme` | `snapcount://` (with the `://`; bare `snapcount` goes in `CFBundleURLSchemes`) |
 | `MetaAppID` | `0` for developer mode, else from Developer Center |
 | `ClientToken` | From Developer Center (not needed for `MetaAppID = 0`) |
 | `TeamID` | `U7W22L3PVZ` |

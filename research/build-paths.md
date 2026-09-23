@@ -23,7 +23,7 @@ No phone app of your own involved. Ray-Ban Display only.
 | Languages | HTML/CSS/JS | Swift (iOS), Kotlin (Android) |
 | Device support | Ray-Ban Display only | Display, Ray-Ban Meta Gen 1/2, Optics, Oakley HSTN, Oakley Vanguard |
 | Camera | No | Yes (stream + photo capture) |
-| Microphone / audio | No | Yes |
+| Microphone / audio | No | **Unverified** - see device-access-toolkit.md |
 | Display output | Yes (600x600 viewport) | Yes (UI component set) on Display models |
 | Motion / orientation | Yes (DeviceMotion/DeviceOrientation) | TBC |
 | GPS | Yes (relayed from phone) | Via phone app natively |

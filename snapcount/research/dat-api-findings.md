@@ -133,7 +133,8 @@ Inside an `MWDAT` dictionary:
 
 Top level:
 - `CFBundleURLTypes` - matching the AppLinkURLScheme
-- `UIBackgroundModes` - `bluetooth-central`
+- ~~`UIBackgroundModes` - `bluetooth-central`~~ **WRONG.** It is `bluetooth-peripheral` plus
+  `external-accessory`. See `../docs/info-plist.md`.
 - `NSBluetoothAlwaysUsageDescription`
 - `NSLocalNetworkUsageDescription`
 - `NSBonjourServices` - `_bonjour._tcp`
