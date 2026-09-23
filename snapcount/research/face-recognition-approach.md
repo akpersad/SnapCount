@@ -84,6 +84,9 @@ Mitigations:
 
 ## Toolchain note
 
+**Resolved 2026-09-22:** the pre-converted AdaFace IR-18 build is in use, so none of the
+Python below is needed. Kept for the record.
+
 `coremltools` is not installed, and system Python is **3.14.7**, which is likely ahead of
 coremltools support. Plan on a 3.11 or 3.12 virtualenv for the conversion step.
 

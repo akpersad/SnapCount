@@ -74,7 +74,7 @@ public struct ThresholdTuner: Sendable {
         return results
     }
 
-    /// Lowest threshold that still meets a precision floor, maximising recall subject to it.
+    /// Threshold that maximises recall subject to a precision floor.
     ///
     /// Precision-first rather than best-F1 on purpose. A false positive means the app counted
     /// a photo of someone else's child as the user's, which is the failure that actually
@@ -90,12 +90,21 @@ public struct ThresholdTuner: Sendable {
         from scores: [LabelledScore],
         minimumPrecision: Double = 0.98
     ) -> ThresholdResult? {
-        sweep(scores)
+        let qualifying = sweep(scores)
             .filter { $0.truePositives > 0 }
             .filter { $0.precision >= minimumPrecision }
-            .max { lhs, rhs in
-                if lhs.recall == rhs.recall { return lhs.threshold > rhs.threshold }
-                return lhs.recall < rhs.recall
-            }
+        guard let bestRecall = qualifying.map(\.recall).max() else { return nil }
+
+        // Many thresholds usually tie on recall: everything in the gap between the highest
+        // impostor and the lowest genuine score. Take the middle of that plateau rather than
+        // an edge. The low edge sits a hair above the worst impostor in a small tuning set, so
+        // the first unseen child who scores slightly higher gets counted. The high edge does
+        // the same to her own harder photos. The midpoint leaves margin on both sides.
+        let plateau = qualifying.filter { $0.recall == bestRecall }
+        guard let low = plateau.first?.threshold, let high = plateau.last?.threshold else {
+            return nil
+        }
+        let middle = (low + high) / 2
+        return plateau.min { abs($0.threshold - middle) < abs($1.threshold - middle) }
     }
 }

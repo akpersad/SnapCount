@@ -16,7 +16,7 @@ ARCHIVE="${MODELS_DIR}/AdaFace_IR18.mlpackage.zip"
 MODEL="${MODELS_DIR}/AdaFace_IR18.mlpackage"
 
 # Pin this once the first successful download is verified, then enforce it below.
-EXPECTED_SHA256=""
+EXPECTED_SHA256="c639ffc02233c72c10daf90f484e14bf570b7f70f55f0c0ee1ce3d284a04430b"
 
 mkdir -p "${MODELS_DIR}"
 
@@ -48,6 +48,5 @@ rm -f "${ARCHIVE}"
 
 echo "Done: ${MODEL}"
 echo
-echo "Next: inspect the model's input/output feature names, which CoreMLFaceEmbedder needs."
-echo "  python3 -c \"import coremltools as ct; m=ct.models.MLModel('${MODEL}'); print(m.get_spec().description)\""
-echo "Or open the .mlpackage in Xcode, which shows them without any Python."
+echo "Model contract (verified, encoded in AdaFaceIR18): face_image (112x112 BGR) -> embedding"
+echo "(Float16 [1, 512]). Normalization is inside the graph; do not pre-normalize."

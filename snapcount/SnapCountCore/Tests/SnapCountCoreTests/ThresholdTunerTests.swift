@@ -42,6 +42,14 @@ struct ThresholdTunerTests {
         #expect(result.falseNegatives == 0)
     }
 
+    @Test("A wide gap yields a cut in its middle, not hugging the worst impostor")
+    func plateauMidpoint() throws {
+        // Every cut from 0.31 to 0.80 is perfect on this data. Picking 0.31 would leave no
+        // margin for an unseen impostor scoring 0.35; the middle leaves margin both ways.
+        let result = try #require(ThresholdTuner().recommend(from: Self.separable))
+        #expect(abs(result.threshold - 0.555) < 0.011)
+    }
+
     @Test("An indiscriminate reference returns nil rather than a bad threshold")
     func inseparableSet() {
         let inseparable: [LabelledScore] = [

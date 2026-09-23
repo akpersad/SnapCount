@@ -9,3 +9,6 @@ Enrollment/
 ReferencePhotos/
 *.mlmodel
 *.mlpackage
+
+# Downloaded, never committed. Recreate with Scripts/fetch-model.sh.
+Models/

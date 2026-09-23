@@ -13,19 +13,25 @@ public struct EnrolledPerson: Sendable, Codable, Identifiable, Equatable {
     /// How many face crops went into the centroid. More samples across varied angles and
     /// lighting means a more robust reference.
     public var sampleCount: Int
+    /// Cut-off chosen by `ThresholdTuner` against this person's own reference set. Nil until
+    /// tuned, in which case callers fall back to `PhotoAnalyzer`'s default. Optional so
+    /// enrollments written before tuning existed still decode.
+    public var matchThreshold: Float?
 
     public init(
         id: String,
         displayName: String,
         embedding: FaceEmbedding,
         enrolledAt: Date,
-        sampleCount: Int
+        sampleCount: Int,
+        matchThreshold: Float? = nil
     ) {
         self.id = id
         self.displayName = displayName
         self.embedding = embedding
         self.enrolledAt = enrolledAt
         self.sampleCount = sampleCount
+        self.matchThreshold = matchThreshold
     }
 }
 
@@ -120,15 +126,8 @@ public struct Enroller: Sendable {
         now: Date = Date()
     ) async throws -> EnrolledPerson {
         var embeddings: [FaceEmbedding] = []
-
         for image in referenceImages {
-            let faces = try await detector.detectFaces(in: image)
-            guard let largest = faces.max(by: {
-                $0.boundingBox.width * $0.boundingBox.height
-                    < $1.boundingBox.width * $1.boundingBox.height
-            }) else { continue }
-
-            if let embedding = try? await embedder.embed(largest.crop) {
+            if let embedding = try await largestFaceEmbedding(in: image) {
                 embeddings.append(embedding)
             }
         }
@@ -143,5 +142,19 @@ public struct Enroller: Sendable {
             embedding: centroid,
             enrolledAt: now,
             sampleCount: embeddings.count)
+    }
+
+    /// Embedding of the largest face in one image, or nil if no face survives filtering.
+    ///
+    /// Exposed separately from `enroll` so the tuning harness can hold out one reference photo
+    /// at a time. Scoring a photo against a centroid it helped build inflates the score and
+    /// would produce an optimistic threshold.
+    public func largestFaceEmbedding(in image: CGImage) async throws -> FaceEmbedding? {
+        let faces = try await detector.detectFaces(in: image)
+        guard let largest = faces.max(by: {
+            $0.boundingBox.width * $0.boundingBox.height
+                < $1.boundingBox.width * $1.boundingBox.height
+        }) else { return nil }
+        return try? await embedder.embed(largest.crop)
     }
 }

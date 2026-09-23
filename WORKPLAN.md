@@ -4,7 +4,7 @@
 immediately. Read this first; it should make re-reading the research files unnecessary for
 most tasks.
 
-Last updated: 2026-09-22 (documentation audit: 15 contradictions reconciled across 16 files)
+Last updated: 2026-09-22 (Phase 2a done: AdaFace wired and verified; enrollment CLI built)
 
 ---
 
@@ -38,8 +38,9 @@ Test every feature in airplane mode.
 | Meta AI app version | **289.0.0.21.157** - clears the V282 floor |
 | Wearables Developer Center org | Done |
 | Wearables Developer Center project | **Done.** MetaAppID + ClientToken in `Secrets.xcconfig` |
-| Recognition core (`SnapCountCore`) | **Done, 23 tests passing** |
-| Core ML embedding model | Not sourced |
+| Recognition core (`SnapCountCore`) | **Done, 27 tests passing** |
+| Core ML embedding model | **Done.** AdaFace IR-18 fetched, checksum pinned, same-vs-different check passes |
+| Enrollment + tuning CLI | **Done.** `snapcount-enroll`, waiting on photos |
 | Enrollment photos | Not provided |
 | Xcode app target | Not created |
 | DAT integration | Not started |
@@ -106,7 +107,7 @@ Top level: `CFBundleURLTypes`, `UIBackgroundModes` (`bluetooth-peripheral` **and
 
 ### Environment
 - Xcode 27, Swift 6.4, iOS 27 SDK, macOS 26.7
-- Python 3.14.7, **no coremltools** (3.14 likely unsupported; plan a 3.11/3.12 venv)
+- Python 3.14.7, no coremltools. **Not needed**: the model is pre-converted.
 - `~/.bash_profile` overrides `cd` so it returns non-zero in non-interactive shells.
   **`cd x && y` silently skips `y`.** Use absolute paths or `--package-path`.
 
@@ -130,7 +131,7 @@ unblocked on the Meta side.
 ### Phase 1: Recognition core  [DONE]
 
 `snapcount/SnapCountCore`, a Swift package that builds and tests from the command line with no
-Xcode project, no glasses, and no Developer Center account. **23 tests passing.**
+Xcode project, no glasses, and no Developer Center account. **27 tests passing.**
 
 | File | Role |
 |---|---|
@@ -139,7 +140,10 @@ Xcode project, no glasses, and no Developer Center account. **23 tests passing.*
 | `FaceEmbedder.swift` | Protocol, Vision feature-print fallback, Core ML implementation |
 | `EnrollmentStore.swift` | `EnrolledPerson`, JSON persistence, backup exclusion, `Enroller` |
 | `PhotoAnalyzer.swift` | Per-photo orchestration, `DailyTally` |
-| `ThresholdTuner.swift` | Precision-first threshold sweep |
+| `ThresholdTuner.swift` | Precision-first threshold sweep, midpoint of the best-recall plateau |
+| `AdaFace.swift` | Verified model contract (`AdaFaceIR18`), compiles `.mlpackage` on the fly |
+| `ImageLoading.swift` | EXIF-upright, 2048 px-bounded decode. Use it for PhotoKit data too |
+| `snapcount-enroll/main.swift` | CLI for 2b + 2c |
 
 ```
 swift build --package-path snapcount/SnapCountCore
@@ -148,21 +152,30 @@ swift test  --package-path snapcount/SnapCountCore
 
 ---
 
-### Phase 2: Model and enrollment  [NEXT, unblocked except for photos]
+### Phase 2: Model and enrollment  [2a DONE; 2b/2c tooling done, blocked on photos]
 
-- [ ] **2a. Fetch and wire the AdaFace IR-18 Core ML model.** Pre-converted, so no
-      coremltools and no Python venv needed. Run `snapcount/Scripts/fetch-model.sh`.
-      Then inspect the `.mlpackage` for its real input and output feature names and pass them
-      to `CoreMLFaceEmbedder`; they are currently unknown.
-      *Acceptance:* `CoreMLFaceEmbedder` returns a 512-d embedding for a test crop, and two
-      photos of the same person score higher than two photos of different people.
-- [ ] **2b. Enrollment CLI or test harness.** Read `ReferencePhotos/daughter/`, build the
-      centroid, write `enrollment.json`.
-      *Acceptance:* enrollment.json exists with `sampleCount` >= 10.
-- [ ] **2c. Tune the threshold.** Run `ThresholdTuner` over daughter vs `negatives/`.
-      *Acceptance:* a threshold reaching >=0.98 precision with usable recall. **If
-      `recommend()` returns nil, the reference set is not discriminative and needs better
+- [x] **2a. Fetch and wire the AdaFace IR-18 Core ML model.** Done. Checksum pinned in
+      `fetch-model.sh`. Contract, read from the compiled graph (not guessed):
+      input `face_image`, 112x112 Image, **BGR**; the graph applies `x * 2/255 - 1` itself, so
+      **do not pre-normalize**. Output `embedding`, Float16 `[1, 512]`, L2-normalized in-graph.
+      Encoded in `AdaFaceIR18`. Sanity check on public-domain official portraits
+      (`snapcount/Models/SanityFaces/`, gitignored): same-person 0.67-0.72, worst
+      different-person pair 0.21.
+- [ ] **2b + 2c. Enroll and tune.** Tool is built; just run it once photos exist:
+      ```
+      swift run --package-path snapcount/SnapCountCore snapcount-enroll
+      ```
+      Reads `ReferencePhotos/daughter/` and `ReferencePhotos/negatives/`, writes
+      `snapcount/Enrollment/enrollment.json` (gitignored) including the tuned `matchThreshold`.
+      Her photos are scored **leave-one-out** so the threshold is not optimistic. Every face in
+      a negatives photo is scored, not just the largest. Prints the weakest reference photos
+      and the most similar strangers. Exit 2 means no threshold reached precision (see below).
+      *Acceptance:* `sampleCount` >= 10 and a threshold at >=0.98 precision with usable recall.
+      **If no threshold qualifies, the reference set is not discriminative and needs better
       photos.** That is a real possible outcome, not a bug.
+      Photo guidance: 15-30 of her from the last year, varied angles and lighting, her face
+      the largest in frame. Negatives: 30+ photos of **other children her age**, never her.
+      Adult negatives will make the threshold look far safer than it is.
 
 **Blocked on:** user providing photos in `snapcount/ReferencePhotos/{daughter,negatives}/`.
 
@@ -233,7 +246,7 @@ library.
 |---|---|---|---|
 | 1 | ~~Universal link vs custom URL scheme?~~ **RESOLVED.** The field accepted `snapcount://`, so no hosted `apple-app-site-association` is needed. | Done | none |
 | 2 | ~~Does camera permission work with `MetaAppID = 0`?~~ **MOOT.** A real `MetaAppID` was issued and camera permission is declared and toggled on. | Done | none |
-| 6 | What are AdaFace IR-18's Core ML input/output feature names, and does it expect 0-1 or -1..1 normalization? | Inspect the `.mlpackage` after fetching. Wrong normalization produces plausible-looking but useless embeddings, so verify with a same-person vs different-person sanity check. | Phase 2a |
+| 6 | ~~AdaFace feature names and normalization?~~ **RESOLVED.** `face_image` (BGR) to `embedding`; [-1, 1] normalization is inside the graph. See 2a. | Done | none |
 | 7 | Pretrained-weight licensing. The AdaFace repo is MIT, but the weights derive from datasets with research-use restrictions. | Fine for a personal, undistributed app. Needs a real answer before any release. Distribution is closed during the preview anyway. | Distribution only |
 | 3 | Does photo capture require a running stream? | Read the 0.9 reference or test. Determines whether all-day capture is battery-viable. | Phase 6 |
 | 4 | Are raw swipe/pinch events exposed, or only `Button` taps? | Button taps are sufficient, so this is informational. | none |

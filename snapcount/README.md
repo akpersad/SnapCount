@@ -81,8 +81,11 @@ non-interactive shells, which silently breaks `cd x && y`. Use absolute paths or
 | `EnrollmentStore.swift` | `EnrolledPerson`, JSON persistence, backup exclusion, `Enroller` |
 | `PhotoAnalyzer.swift` | Per-photo orchestration, `DailyTally` |
 | `ThresholdTuner.swift` | Precision-first threshold sweep over labelled data |
+| `AdaFace.swift` | Verified AdaFace IR-18 model contract and loader |
+| `ImageLoading.swift` | EXIF-upright, size-bounded decode for the pipeline |
+| `snapcount-enroll` (executable) | Offline enrollment + leave-one-out threshold tuning |
 
-23 tests passing. The alignment geometry is pinned by six of them, including both roll
+27 tests passing, 3 of which run the real AdaFace model and skip if it is not fetched. The alignment geometry is pinned by six of them, including both roll
 directions and extreme up/downscale, because a silently misaligned crop degrades every
 embedding without ever failing visibly.
 
@@ -108,5 +111,5 @@ the capture-quality filter has almost certainly dropped the face anyway.
    may be expensive. Unmeasured.
 3. **Timeline.** Roughly six days, from zero, on a pre-1.0 SDK. Steps 1-3 are realistic.
    4-6 depend on how cleanly registration goes.
-4. **coremltools vs Python 3.14.** System Python is likely ahead of coremltools support.
-   Plan a 3.11/3.12 venv, or find a pre-converted model.
+4. ~~**coremltools vs Python 3.14.**~~ Resolved: a pre-converted model is used, so no Python
+   toolchain is needed.

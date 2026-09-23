@@ -54,7 +54,7 @@ public struct VisionFeaturePrintEmbedder: FaceEmbedder {
     }
 }
 
-/// Embedder backed by a MobileFaceNet-family Core ML model.
+/// Embedder backed by an ArcFace-convention Core ML model (AdaFace IR-18; see `AdaFaceIR18`).
 ///
 /// `MLModel` prediction is thread-safe, so this is safe to share across the concurrent
 /// per-photo work even though `MLModel` itself is not `Sendable`.
