@@ -147,6 +147,19 @@ Also handle the registration callback:
 .onOpenURL { url in Wearables.shared.handleUrl(url) }
 ```
 
+## Firmware versions are minimums
+
+Meta's version-dependencies page lists **V125** for Ray-Ban Display under DAT 0.9.0 with no
+"minimum" or "at least" wording, which reads as a pin. It is not. The companion table in
+`../../research/setup-developer-mode.md` is headed "Absolute floors per device" with a **Min
+firmware** column, which establishes the page lists floors.
+
+**Device in use is on V128**, which clears the V125 floor. DAT 0.9.0 is the newest tag on the
+repo, so there is no later SDK to move to regardless.
+
+This is inference rather than an explicit statement from Meta, but it is cheap to falsify:
+registration either succeeds or it does not.
+
 ## Gotchas worth pinning to the wall
 
 1. **Developer Mode must be re-enabled after a firmware update.** You are about to update
