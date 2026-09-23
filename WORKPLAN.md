@@ -35,9 +35,9 @@ Test every feature in airplane mode.
 | Meta developer account | Done |
 | Developer Mode in Meta AI app | **On** (verified still on after V128 firmware update) |
 | Glasses firmware | **V128** (clears the V125 floor for DAT 0.9) |
-| Meta AI app version | **UNVERIFIED** - needs V282 |
+| Meta AI app version | **289.0.0.21.157** - clears the V282 floor |
 | Wearables Developer Center org | Done |
-| Wearables Developer Center project | Created; **Configuration pending** |
+| Wearables Developer Center project | **Done.** MetaAppID + ClientToken in `Secrets.xcconfig` |
 | Recognition core (`SnapCountCore`) | **Done, 23 tests passing** |
 | Core ML embedding model | Not sourced |
 | Enrollment photos | Not provided |
@@ -115,15 +115,14 @@ Top level: `CFBundleURLTypes`, `UIBackgroundModes` (`bluetooth-peripheral` **and
 
 Ordered by dependency. Phases 1 and 2 need nothing from Meta.
 
-### Phase 0: Developer Center configuration  [BLOCKED ON USER]
+### Phase 0: Developer Center configuration  [DONE]
 
-Fill the Configuration screen. See section 7 for exact values.
+Team ID, Bundle ID `com.akpersad.snapcount`, and Universal link `snapcount://` saved.
+`MetaAppID` and `ClientToken` are in `snapcount/Secrets.xcconfig` (gitignored, verified absent
+from all commits).
 
-- [ ] Team ID, Bundle ID, Universal link
-- [ ] Toggle **Camera access** on, add rationale
-- [ ] Capture the generated `MetaAppID` and `ClientToken` into `snapcount/Secrets.xcconfig`
-
-**Acceptance:** Secrets.xcconfig has non-empty `META_APP_ID` and `META_CLIENT_TOKEN`.
+**Outstanding:** confirm the **Camera access** toggle is on with a rationale. If the runtime
+permission prompt never fires in Phase 5, this is the first thing to check.
 
 ---
 
@@ -229,7 +228,7 @@ library.
 
 | # | Question | How to resolve | Blocks |
 |---|---|---|---|
-| 1 | Universal link vs custom URL scheme? Docs conflict: the iOS guide shows `myexampleapp://`, other text says it "should be a universal link registered with Apple," and the Developer Center has a Universal link field. | Try saving Configuration with the custom scheme or blank first. If registration callback fails, host an `apple-app-site-association` on Vercel. **Only affects registration, which happens on land, so it does not threaten offline operation.** | Phase 5 |
+| 1 | ~~Universal link vs custom URL scheme?~~ **RESOLVED.** The field accepted `snapcount://`, so no hosted `apple-app-site-association` is needed. | Done | none |
 | 2 | Does camera permission work with `MetaAppID = 0`? | Empirical. If the prompt never fires, the permission is probably not declared on the project. | Phase 5 |
 | 3 | Does photo capture require a running stream? | Read the 0.9 reference or test. Determines whether all-day capture is battery-viable. | Phase 6 |
 | 4 | Are raw swipe/pinch events exposed, or only `Button` taps? | Button taps are sufficient, so this is informational. | none |
@@ -242,10 +241,13 @@ library.
 For the Wearables Developer Center **Configuration** page, iOS tab:
 
 ```
-Team ID:        U7W22L3PVZ
-Bundle ID:      com.akpersad.snapcount
-Universal link: see open question 1 - try blank or a custom scheme first
+Team ID:        U7W22L3PVZ        [saved]
+Bundle ID:      com.akpersad.snapcount   [saved]
+Universal link: snapcount://      [saved]
 ```
+
+**Watch out:** Meta's generated plist snippet uses their placeholder `myexampleapp://`. It must
+be changed to `snapcount://` to match what was saved. See `snapcount/docs/info-plist.md`.
 
 Note the banner: iOS bundle ID and Android package name must be identical. Hyphens are not
 supported in iOS bundle IDs.
@@ -270,7 +272,8 @@ After saving, the page issues `MetaAppID` and `ClientToken`. Put both in
 4. Remember the `cd` gotcha in section 4.
 
 Deeper detail, only if needed:
-- `snapcount/docs/setup-walkthrough.md` - Developer Center and Info.plist specifics
+- `snapcount/docs/info-plist.md` - **the paste-ready Info.plist**
+- `snapcount/docs/setup-walkthrough.md` - Developer Center specifics
 - `snapcount/docs/privacy-architecture.md` - the no-egress checklist
 - `snapcount/research/dat-api-findings.md` - the 0.9 API surface
 - `snapcount/research/face-recognition-approach.md` - model choice, child-accuracy problem
