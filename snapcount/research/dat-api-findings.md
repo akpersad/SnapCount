@@ -112,7 +112,18 @@ app, contradicting the earlier guess that gestures were Web Apps only.
 Still unverified: whether raw swipe/pinch events are exposed, or only button taps. For this
 project button taps are sufficient.
 
-## Full Info.plist key list
+## CORRECTION (2026-09-22, later): earlier Info.plist notes were wrong
+
+`AGENTS.md` in the SDK repo contradicts the docs site on two keys, and adds one that was
+missing entirely. See `../docs/setup-walkthrough.md` for the corrected table.
+
+- Background mode is `bluetooth-peripheral` + `external-accessory`, **not** `bluetooth-central`
+- `UISupportedExternalAccessoryProtocols` must include `com.meta.ar.wearable` - was missing
+- `MetaAppID` can be **`0`** in developer mode, so a Developer Center project may be optional
+- Module list also includes `MWDATDisplay` and `MWDATMockDevice`
+- Meta hosts a public docs MCP at `https://mcp.developer.meta.com/wearables`, no auth
+
+## Full Info.plist key list (SUPERSEDED - see setup-walkthrough.md)
 
 Inside an `MWDAT` dictionary:
 - `AppLinkURLScheme`
