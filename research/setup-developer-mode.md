@@ -51,7 +51,7 @@ Identical on iOS and Android.
 **Meta AI settings** > **App connections** should now show a **Developer mode apps** section. Empty
 until an app registers, but its existence confirms Developer Mode is live.
 
-## Wearables Developer Center  [NOT DONE]
+## Wearables Developer Center  [DONE 2026-09-22]
 
 Separate from the phone setup. https://wearables.developer.meta.com/
 
@@ -75,5 +75,5 @@ project exactly.
 **Worked yesterday, broken today.** Only one third-party app can hold a Developer Mode registration
 at a time. A second project against the same glasses kicks the first out.
 
-**Permission prompt never fires.** Registration does not grant camera or mic. If no prompt appears,
+**Permission prompt never fires.** Registration does not grant camera access. If no prompt appears,
 the permission is probably not declared on the Developer Center project.

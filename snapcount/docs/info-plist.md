@@ -1,6 +1,7 @@
 # Info.plist Reference
 
-Complete and corrected. Paste-ready for the app target.
+Complete and corrected. **The live file is `snapcount/SnapCount/Info.plist`**; this page
+explains it. If the two ever disagree, the live file wins and this page is stale.
 
 ## The scheme mismatch to fix first
 
@@ -17,6 +18,14 @@ with no useful error.
 Open question 1 is closed. The Developer Center Universal link field accepted `snapcount://`,
 so a real universal link with a hosted `apple-app-site-association` file is **not** required.
 No domain, no Vercel, no associated-domains entitlement.
+
+## Correction (2026-09-23): the opt-outs are nested
+
+An earlier version of this page put a single `OptOut` directly under `MWDAT`. That is wrong,
+and following it would have left **both analytics and crash reporting on**. The SDK README at
+tag 0.9.0 specifies `MWDAT > Analytics > OptOut` and `MWDAT > CrashReporting > OptOut`.
+`SnapCount/PrivacyChecks.swift` now halts the app at launch if either is missing, and also if
+any `$(...)` secret was left unsubstituted.
 
 ## Values that come from Secrets.xcconfig
 
@@ -44,10 +53,18 @@ so `snapcount://` would be silently truncated to `snapcount:`. Keep it a literal
     <key>TeamID</key>
     <string>$(DEVELOPMENT_TEAM)</string>
 
-    <!-- Disables Meta analytics. Required for this project: see privacy-architecture.md.
-         Crash reporting is enabled by default and must be turned off too. -->
-    <key>OptOut</key>
-    <true/>
+    <!-- Analytics and crash reporting are both ON by default. Each needs its own nested
+         dictionary. A bare OptOut directly under MWDAT is ignored. -->
+    <key>Analytics</key>
+    <dict>
+        <key>OptOut</key>
+        <true/>
+    </dict>
+    <key>CrashReporting</key>
+    <dict>
+        <key>OptOut</key>
+        <true/>
+    </dict>
 </dict>
 
 <!-- Claim the scheme Meta AI calls back on -->

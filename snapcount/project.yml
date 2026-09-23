@@ -1,0 +1,52 @@
+# XcodeGen spec. SnapCount.xcodeproj is generated from this file and is gitignored.
+#   xcodegen generate --spec snapcount/project.yml
+name: SnapCount
+
+options:
+  bundleIdPrefix: com.akpersad
+  deploymentTarget:
+    iOS: "18.0"  # SnapCountCore uses the Swift Vision API, which needs 18
+  createIntermediateGroups: true
+
+packages:
+  SnapCountCore:
+    path: SnapCountCore
+  MetaWearablesDAT:
+    url: https://github.com/facebook/meta-wearables-dat-ios
+    exactVersion: 0.9.0  # pre-1.0: pin exactly, never float
+
+configFiles:
+  # Gitignored. Copy Secrets.xcconfig.template to create it.
+  Debug: Secrets.xcconfig
+  Release: Secrets.xcconfig
+
+targets:
+  SnapCount:
+    type: application
+    platform: iOS
+    sources:
+      - path: SnapCount
+      # Xcode compiles this to .mlmodelc at build time. Gitignored; run Scripts/fetch-model.sh.
+      - path: Models/AdaFace_IR18.mlpackage
+        optional: true
+    dependencies:
+      - package: SnapCountCore
+      - package: MetaWearablesDAT
+        product: MWDATCore
+      - package: MetaWearablesDAT
+        product: MWDATCamera
+      - package: MetaWearablesDAT
+        product: MWDATDisplay
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.akpersad.snapcount
+        INFOPLIST_FILE: SnapCount/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        SWIFT_VERSION: "6.0"
+        SWIFT_STRICT_CONCURRENCY: complete
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"

@@ -5,7 +5,7 @@ Meta offers two unrelated ways to build for its AI glasses. They are not tiers o
 ## Device Access Toolkit (DAT) - CHOSEN PATH
 
 A **mobile SDK**. Code lives in an iOS or Android app that runs on the phone. The glasses act as a
-peripheral: camera in, audio in/out, display out.
+peripheral: camera in, display out (audio unverified at 0.9).
 
 Important clarification: "extend an existing app" in Meta's marketing does NOT mean an App Store
 published app. A brand new Xcode project works. See `device-access-toolkit.md`.
@@ -33,5 +33,6 @@ No phone app of your own involved. Ray-Ban Display only.
 
 ## Why native was chosen
 
-Camera and mic are the deciding factor, plus broader device coverage. Trade-off accepted: slower
+Camera is the deciding factor (microphone access turned out to be unverified), plus broader
+device coverage. Trade-off accepted: slower
 iteration loop and no display simulation without the physical glasses.

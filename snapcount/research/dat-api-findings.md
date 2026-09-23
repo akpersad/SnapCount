@@ -21,8 +21,10 @@ Separate from image data, and it must be turned off explicitly.
 
 > "Meta may collect information about how users' Meta devices communicate with your app."
 
-- Analytics: opt out with `OptOut = true` in Info.plist
-- Crash reporting: **enabled by default**, disable the same way
+- Analytics: opt out with `MWDAT > Analytics > OptOut = true`
+- Crash reporting: **enabled by default**, opt out with `MWDAT > CrashReporting > OptOut = true`
+- Both are nested dictionaries. A bare `OptOut` under `MWDAT` is ignored (corrected
+  2026-09-23 from the SDK README; earlier notes had it flat).
 
 This is connection metadata, not image content. Turning both off is non-negotiable for this
 project. See `../docs/privacy-architecture.md`.
@@ -142,8 +144,10 @@ Top level:
 
 ## SPM
 
-`https://github.com/facebook/meta-wearables-dat-ios` at 0.9.0.
-Modules: `MWDATCore`, `MWDATCamera`. Display module name not yet confirmed.
+`https://github.com/facebook/meta-wearables-dat-ios` at tag `0.9.0` (no `v`).
+Products (confirmed from `Package.swift`): `MWDATCore`, `MWDATCamera`, `MWDATDisplay`,
+`MWDATMockDevice`, `MWDATMockDeviceTestClient`. Binary xcframeworks with device and simulator
+slices.
 
 ## Sources
 

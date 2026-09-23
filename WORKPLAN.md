@@ -4,7 +4,7 @@
 immediately. Read this first; it should make re-reading the research files unnecessary for
 most tasks.
 
-Last updated: 2026-09-22 (Phase 2a done: AdaFace wired and verified; enrollment CLI built)
+Last updated: 2026-09-23 (Phase 3a-3c done: app builds and runs; opt-out plist structure corrected)
 
 ---
 
@@ -13,7 +13,7 @@ Last updated: 2026-09-22 (Phase 2a done: AdaFace wired and verified; enrollment 
 An iOS app that counts how many photos taken today contain a specific person (the user's
 daughter), showing a glanceable count on Meta Ray-Ban Display glasses.
 
-**Deadline: a Disney Cruise departing the week of 2026-09-28.** Roughly six days.
+**Deadline: a Disney Cruise departing the week of 2026-09-28.**
 
 ### Two hard constraints, both non-negotiable
 
@@ -42,11 +42,11 @@ Test every feature in airplane mode.
 | Core ML embedding model | **Done.** AdaFace IR-18 fetched, checksum pinned, same-vs-different check passes |
 | Enrollment + tuning CLI | **Done.** `snapcount-enroll`, waiting on photos |
 | Enrollment photos | Not provided |
-| Xcode app target | Not created |
+| Xcode app target | **Done.** Generated from `snapcount/project.yml`; builds and runs in the simulator. Not yet run on a physical iPhone |
 | DAT integration | Not started |
 | Glasses HUD | Not started |
 | Git remote | `git@github.com-personal:akpersad/SnapCount.git`, pushed |
-| Docs MCP | Added at project scope, **pending approval** |
+| Docs MCP | **Done.** Approved; `search_dat_docs` tool available in sessions |
 
 ---
 
@@ -67,6 +67,9 @@ Recorded so they are not re-litigated. Each has a reason; revisit only if the re
 | Recognition runs async, off the capture path | A few seconds of lag is invisible and it removes all latency pressure from the camera pipeline. |
 | Secrets in gitignored `Secrets.xcconfig` | One pattern for all identifiers beats case-by-case judgement about which are sensitive. |
 | `ReferencePhotos/` ignored with **zero exceptions** | An ignore rule protecting a child's photos should have no carve-outs. Guidance lives in `docs/` instead. |
+| XcodeGen; `.xcodeproj` generated and gitignored | A readable `project.yml` diffs and reviews cleanly, and a hand-edited `.pbxproj` is where unreviewable config drift hides. |
+| Privacy config **fails closed** at launch | The opt-out keys are easy to get subtly wrong (this project already did once). A crash at launch beats an app that quietly reports home. |
+| Tuner picks the **middle** of the best-recall threshold range | The low edge hugs the worst impostor in a small tuning set, so the first unseen child scoring slightly higher gets counted. |
 
 ---
 
@@ -77,17 +80,21 @@ Researched and confirmed. Do not re-derive.
 ### Privacy and data path
 - Camera streaming: glasses to phone over **local-network Wi-Fi (Bonjour)**, or BLE without
   streaming. **Image data does not transit Meta's cloud.**
-- Meta SDK **analytics and crash reporting are ON by default**. Disable with `OptOut = true`
-  in the `MWDAT` Info.plist dictionary. Crash reporting needs the same treatment.
+- Meta SDK **analytics and crash reporting are ON by default**. Each is disabled by its own
+  **nested** dictionary: `MWDAT > Analytics > OptOut = true` and
+  `MWDAT > CrashReporting > OptOut = true`. A bare `OptOut` directly under `MWDAT` is **ignored**
+  (earlier docs had this wrong; source is the SDK repo README at tag 0.9.0).
+  `PrivacyChecks.swift` halts the app at launch if either is missing.
 
 ### Versions
-- DAT **0.9.0** is the newest tag. No 1.0 exists.
+- DAT **0.9.0** is the newest tag (named `0.9.0`, no `v` prefix). No 1.0 exists.
 - Firmware numbers on Meta's version page are **floors, not pins**. Display floor is V125.
 - Meta AI app needs **V282**.
 - Developer Mode must be re-enabled after firmware updates (did not trigger this time).
 
 ### SDK surface
-- Modules: `MWDATCore`, `MWDATCamera`, `MWDATDisplay`, `MWDATMockDevice`
+- Modules: `MWDATCore`, `MWDATCamera`, `MWDATDisplay`, `MWDATMockDevice`,
+  `MWDATMockDeviceTestClient`. All binary xcframeworks with **device and simulator** slices.
 - `Permission` enum has exactly **one** case: `.camera`. Earlier research claiming microphone
   access is **unverified** and may be marketing copy. Irrelevant here; `snapcount` needs no audio.
 - Display components: `FlexBox`, `Text`, `Image`, `Button`, `ButtonGroup`, `Icon`,
@@ -99,7 +106,8 @@ Researched and confirmed. Do not re-derive.
 
 ### Info.plist keys
 Inside an `MWDAT` dictionary: `AppLinkURLScheme`, `MetaAppID`, `ClientToken`, `TeamID`,
-`OptOut`.
+`Analytics` (dict: `OptOut`), `CrashReporting` (dict: `OptOut`). The live file is
+`snapcount/SnapCount/Info.plist`.
 Top level: `CFBundleURLTypes`, `UIBackgroundModes` (`bluetooth-peripheral` **and**
 `external-accessory`), `UISupportedExternalAccessoryProtocols` (`com.meta.ar.wearable`),
 `NSBluetoothAlwaysUsageDescription`, `NSLocalNetworkUsageDescription`, `NSBonjourServices`
@@ -108,6 +116,10 @@ Top level: `CFBundleURLTypes`, `UIBackgroundModes` (`bluetooth-peripheral` **and
 ### Environment
 - Xcode 27, Swift 6.4, iOS 27 SDK, macOS 26.7
 - Python 3.14.7, no coremltools. **Not needed**: the model is pre-converted.
+- XcodeGen is installed (`/opt/homebrew/bin/xcodegen`). `SnapCount.xcodeproj` is generated
+  and gitignored; `project.yml` is the source.
+- Simulator: iPhone 18 Pro, iOS 27, UDID `F0AA0FF7-F299-472E-9A1D-1AD0EEB905B3`. Build with
+  `-destination 'generic/platform=iOS Simulator'`; named destinations like "iPhone 16 Pro" fail.
 - `~/.bash_profile` overrides `cd` so it returns non-zero in non-interactive shells.
   **`cd x && y` silently skips `y`.** Use absolute paths or `--package-path`.
 
@@ -115,7 +127,7 @@ Top level: `CFBundleURLTypes`, `UIBackgroundModes` (`bluetooth-peripheral` **and
 
 ## 5. Phases
 
-Ordered by dependency. Phases 1 and 2 need nothing from Meta.
+Ordered by dependency. Phases 1 to 4 need nothing from Meta.
 
 ### Phase 0: Developer Center configuration  [DONE]
 
@@ -173,21 +185,26 @@ swift test  --package-path snapcount/SnapCountCore
       *Acceptance:* `sampleCount` >= 10 and a threshold at >=0.98 precision with usable recall.
       **If no threshold qualifies, the reference set is not discriminative and needs better
       photos.** That is a real possible outcome, not a bug.
-      Photo guidance: 15-30 of her from the last year, varied angles and lighting, her face
-      the largest in frame. Negatives: 30+ photos of **other children her age**, never her.
-      Adult negatives will make the threshold look far safer than it is.
+      Photo guidance lives in `snapcount/docs/enrollment-photos.md`. Short version: 15-30 of
+      her, 30+ of **other children her age** (never her, and not adults).
 
 **Blocked on:** user providing photos in `snapcount/ReferencePhotos/{daughter,negatives}/`.
 
 ---
 
-### Phase 3: iOS app shell
+### Phase 3: iOS app shell  [3a-3c DONE; 3d NEXT]
 
-- [ ] **3a. Create the Xcode app target.** iOS 18+ (SnapCountCore needs the modern Vision API).
-      Bundle ID `com.akpersad.snapcount`. Wire `Secrets.xcconfig`.
-- [ ] **3b. Add the DAT SPM dependency** at 0.9.0.
-- [ ] **3c. Full Info.plist**, including `OptOut = true`.
+- [x] **3a. App target.** `snapcount/project.yml` (XcodeGen): iOS 18, Swift 6 strict
+      concurrency, bundle ID `com.akpersad.snapcount`, `Secrets.xcconfig` as the config file.
+      The model is a source, so Xcode compiles it to `AdaFace_IR18.mlmodelc` in the bundle.
+      App sources in `snapcount/SnapCount/`: `SnapCountApp`, `PrivacyChecks`,
+      `RecognitionModel`, and a `ContentView` status screen (model ready, enrollment state).
+- [x] **3b. DAT SPM dependency**, `exactVersion: 0.9.0`, linking Core, Camera, Display.
+      Imported but not yet called; `Wearables.configure()` is Phase 5a.
+- [x] **3c. Full Info.plist** with both nested opt-outs. Verified in the built bundle, and
+      the app launches past `PrivacyChecks` in the simulator.
 - [ ] **3d. Enrollment UI** - pick photos, show the computed reference, allow re-enrollment.
+      Must also get a tuned threshold onto the phone; see open question 8.
 - [ ] **3e. Review screen** - list today's photos with scores, allow user override. Surface
       `DailyTally.uncertain()` first.
 
@@ -230,7 +247,8 @@ library.
 
 ### Phase 7: Harden and verify  [MUST COMPLETE BEFORE DEPARTURE]
 
-- [ ] `OptOut = true` confirmed; crash reporting disabled
+- [x] Analytics and crash reporting opt-outs in the plist, enforced at launch by `PrivacyChecks`
+- [ ] Opt-outs confirmed by proxy on a real device (covered by the egress check below)
 - [ ] Proxy a full capture session, confirm **zero unexpected egress**
 - [ ] Confirm enrollment data excluded from backup
 - [ ] Delete reference photos after enrollment is verified
@@ -248,7 +266,8 @@ library.
 | 2 | ~~Does camera permission work with `MetaAppID = 0`?~~ **MOOT.** A real `MetaAppID` was issued and camera permission is declared and toggled on. | Done | none |
 | 6 | ~~AdaFace feature names and normalization?~~ **RESOLVED.** `face_image` (BGR) to `embedding`; [-1, 1] normalization is inside the graph. See 2a. | Done | none |
 | 7 | Pretrained-weight licensing. The AdaFace repo is MIT, but the weights derive from datasets with research-use restrictions. | Fine for a personal, undistributed app. Needs a real answer before any release. Distribution is closed during the preview anyway. | Distribution only |
-| 3 | Does photo capture require a running stream? | Read the 0.9 reference or test. Determines whether all-day capture is battery-viable. | Phase 6 |
+| 3 | Does photo capture require a **started** stream? The API does require a `Stream` (capture is `stream.capturePhoto`), but whether `stream.start()` must be running is untested. | Test on device in 5c. Determines whether all-day capture is battery-viable. | Phase 5c, battery item in 7 |
+| 8 | How does the tuned threshold reach the phone? `snapcount-enroll` runs on the Mac against `ReferencePhotos/`; the app enrolls from the photo picker. | Options: (a) app also takes a negatives set and runs `ThresholdTuner` itself, (b) copy the CLI's threshold into the app by hand. (a) is self-contained; (b) is faster. Decide in 3d. | Phase 3d |
 | 4 | Are raw swipe/pinch events exposed, or only `Button` taps? | Button taps are sufficient, so this is informational. | none |
 | 5 | Is text input available on device? | Not needed by this app. | none |
 
@@ -286,12 +305,15 @@ After saving, the page issues `MetaAppID` and `ClientToken`. Put both in
 
 1. Read this file.
 2. `swift test --package-path snapcount/SnapCountCore` to confirm the core is green.
-3. Check section 2 for state and section 5 for the next unchecked item.
-4. Remember the `cd` gotcha in section 4.
+   If `snapcount/Models/` is missing (fresh clone), run `snapcount/Scripts/fetch-model.sh`.
+3. `xcodegen generate --spec snapcount/project.yml`, then build:
+   `xcodebuild -project snapcount/SnapCount.xcodeproj -scheme SnapCount -destination 'generic/platform=iOS Simulator' build`
+4. Check section 2 for state and section 5 for the next unchecked item.
+5. Remember the `cd` gotcha in section 4.
 
 Deeper detail, only if needed:
 - `snapcount/Scripts/fetch-model.sh` - downloads AdaFace IR-18 (gitignored, not committed)
-- `snapcount/docs/info-plist.md` - **the paste-ready Info.plist**
+- `snapcount/SnapCount/Info.plist` - **the live Info.plist** (`docs/info-plist.md` explains it)
 - `snapcount/docs/setup-walkthrough.md` - Developer Center specifics
 - `snapcount/docs/privacy-architecture.md` - the no-egress checklist
 - `snapcount/research/dat-api-findings.md` - the 0.9 API surface

@@ -6,9 +6,10 @@ exceptions**. Nothing in that directory is ever committed or uploaded. This guid
 
 ## `daughter/`
 
-10 to 20 photos for enrollment. What makes a good set:
+15 to 30 photos for enrollment. At least 10 must survive the face filters (the enrollment
+tool reports which ones were skipped and why). What makes a good set:
 
-- **Recent.** A child's face changes fast, and an old reference matches poorly.
+- **Recent.** From the last year. A child's face changes fast, and an old reference matches poorly.
 - **Varied angles.** Straight on, three-quarter left, three-quarter right. Skip full profile,
   the detector discards anything beyond 45 degrees of yaw.
 - **Varied lighting.** Indoor, outdoor, shade. Not all from one afternoon.
@@ -24,10 +25,18 @@ Photos containing **other children of similar age**, for threshold tuning. This 
 proves the threshold actually discriminates rather than matching any child. Without it the
 cut-off is guesswork, and the failure mode is counting someone else's kid.
 
-20 or more is useful. Cousins, classmates, friends. They do not need to be good photos.
+30 or more. Cousins, classmates, friends. They do not need to be good photos, and group
+shots are welcome: every face in a negatives photo is scored, not just the largest.
+
+**Never include her**, not even in the background; it would teach the tuner that her face is
+a stranger's. And **not adults**: an adult is easy to tell apart from a child, so adult
+negatives make the threshold look far safer than it is.
 
 ## What happens to these
 
-Enrollment reads them once, computes a 512-float mean embedding, and writes only that vector
-to the app container. The photos themselves are never copied anywhere, never transmitted, and
-should be deleted from here once enrollment is verified.
+`swift run --package-path snapcount/SnapCountCore snapcount-enroll` reads them once, computes a
+512-float mean embedding plus a tuned match threshold, and writes only those to
+`snapcount/Enrollment/enrollment.json` (gitignored). The photos themselves are never copied
+anywhere, never transmitted, and should be deleted from here once enrollment is verified.
+
+How that threshold reaches the phone is WORKPLAN open question 8.

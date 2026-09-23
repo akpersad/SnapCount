@@ -12,7 +12,7 @@ So identity is ours to build. Two layers:
 
 | Layer | Who does it | API |
 |---|---|---|
-| Find faces in an image | Apple Vision | `DetectFaceRectanglesRequest` |
+| Find faces in an image | Apple Vision | `DetectFaceCaptureQualityRequest` (boxes, pose, and quality in one pass) |
 | Decide whose face it is | Us | Core ML embedding + distance |
 
 ## Layer 1: detection (Vision)
@@ -29,8 +29,11 @@ on them. Cheap accuracy win.
 
 Changed from MobileFaceNet on 2026-09-22, after finding a pre-converted Core ML build.
 
-- Input: 112x112 RGB, ArcFace-convention 5-point alignment (which `FaceDetector` already does)
-- Output: 512-dimensional embedding
+- Input: `face_image`, 112x112 Image, **BGR**. The graph applies `x * 2/255 - 1` itself, so
+  pixels go in unnormalized. Verified from the compiled model on 2026-09-22.
+- Alignment: `FaceDetector` maps the two eye centres onto the canonical ArcFace positions
+  (a 2-point similarity transform, not the full 5-point one)
+- Output: `embedding`, Float16 [1, 512], already L2-normalized in-graph
 - Compare with cosine similarity, threshold tuned on real data
 - Runs on the Neural Engine
 
@@ -56,7 +59,8 @@ datasets (MS1MV2, WebFace4M and similar) that carry research-use restrictions of
 For a personal app that is never distributed, and which cannot be distributed anyway while
 Meta's publishing is closed, this is fine. It would need a real answer before any release.
 
-Enroll with 10-20 photos across angles and lighting, store the mean embedding (L2-normalized).
+Enroll with 15-30 photos across angles and lighting (see `../docs/enrollment-photos.md`),
+store the mean embedding (L2-normalized).
 
 ### Rejected: `VNGenerateImageFeaturePrintRequest`
 

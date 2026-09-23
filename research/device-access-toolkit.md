@@ -6,10 +6,13 @@
 >
 > 1. **`UIBackgroundModes` is `bluetooth-peripheral` + `external-accessory`, NOT
 >    `bluetooth-central`** as stated further down. Also missing here:
->    `UISupportedExternalAccessoryProtocols` = `com.meta.ar.wearable`, and `OptOut`.
+>    `UISupportedExternalAccessoryProtocols` = `com.meta.ar.wearable`, and the nested
+>    `Analytics` / `CrashReporting` opt-out dictionaries.
 > 2. **The microphone claim below is unverified.** The 0.9 `Permission` enum has exactly one
 >    case, `.camera`. Audio may be unexposed, or ungated. Treat "microphone input, audio
 >    output" as marketing copy that was never confirmed against the API.
+> 3. **Platform minimum is iOS 16** per the SDK repo's `AGENTS.md`, not 15.2 as below. The
+>    SnapCount app targets iOS 18 regardless.
 
 Current version at time of research: **0.9.0**, developer preview.
 
@@ -86,4 +89,4 @@ Permission enums:
 - iOS: /docs/reference/ios_swift/dat/latest/mwdatcore_permission#enumeration_constants
 - Android: /docs/reference/android/dat/latest/com_meta_wearable_dat_core_types_permission#enumeration_constants
 
-TODO next session: pull the actual enum list and display component API.
+Done 2026-09-22: see `../snapcount/research/dat-api-findings.md`.

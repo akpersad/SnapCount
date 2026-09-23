@@ -19,25 +19,40 @@ The app makes no outbound connections. This is checkable rather than promised:
 
 ```
 # should return nothing
-grep -rE 'URLSession|Alamofire|\.dataTask|http://|https://' Sources/
+grep -rE 'URLSession|Alamofire|\.dataTask|http://|https://' SnapCount/ SnapCountCore/Sources/
 ```
 
-Add it to the build as a run-script phase so a future edit that adds networking fails loudly.
+Not yet a build phase. Adding it as a run-script phase would make a future edit that adds
+networking fail loudly. (`Scripts/fetch-model.sh` downloads the model at dev time; it is not
+part of the app.)
 
 Caveat: the DAT SDK itself uses the local network for camera streaming. That is link-local
 to the phone, not internet egress. The grep applies to *our* code.
 
 ### 2. Kill Meta's telemetry
 
-In Info.plist, inside the `MWDAT` dictionary:
+Analytics and crash reporting are **both on by default**. Each is disabled by its own nested
+dictionary in Info.plist:
 
 ```xml
-<key>OptOut</key>
-<true/>
+<key>MWDAT</key>
+<dict>
+    <key>Analytics</key>
+    <dict>
+        <key>OptOut</key>
+        <true/>
+    </dict>
+    <key>CrashReporting</key>
+    <dict>
+        <key>OptOut</key>
+        <true/>
+    </dict>
+</dict>
 ```
 
-Disables analytics. Crash reporting is **on by default** and needs the same treatment.
-Verify with Charles or a similar proxy before the trip, not after.
+A bare `OptOut` directly under `MWDAT` is ignored. `SnapCount/PrivacyChecks.swift` halts the
+app at launch if either opt-out is missing, so this cannot silently regress. Still verify with
+Charles or a similar proxy before the trip, not after.
 
 ### 3. Store vectors, not faces
 
@@ -52,10 +67,13 @@ the same handling as a photo would.
 Enrollment data and the photo log live in the app container with:
 
 ```swift
+var url = fileURL
 var values = URLResourceValues()
 values.isExcludedFromBackup = true
-try url.setResourceValues(&values)
+try url.setResourceValues(values)
 ```
+
+(As implemented in `EnrollmentStore`. `setResourceValues` mutates the URL, so it must be a `var`.)
 
 Prevents the biometric template syncing to iCloud.
 
@@ -73,8 +91,8 @@ and never use any cloud-backed model API.
 
 Do these on land, with good Wi-Fi, before boarding.
 
-- [ ] `OptOut = true` set and confirmed
-- [ ] Crash reporting disabled and confirmed
+- [x] Analytics and crash reporting opt-outs set (nested), enforced at launch
+- [ ] Both confirmed silent by proxy on a real device
 - [ ] Proxy the app for one full capture session, confirm zero unexpected egress
 - [ ] Confirm enrollment data is excluded from backup
 - [ ] Confirm reference photos are deleted after enrollment

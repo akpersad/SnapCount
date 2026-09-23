@@ -91,7 +91,10 @@ Inside an `MWDAT` dictionary:
 | `MetaAppID` | `0` for developer mode, else from Developer Center |
 | `ClientToken` | From Developer Center (not needed for `MetaAppID = 0`) |
 | `TeamID` | `U7W22L3PVZ` |
-| `OptOut` | `true` — **disables Meta analytics. Required for this project.** |
+| `Analytics` | dict with `OptOut` = `true`. **Required for this project.** |
+| `CrashReporting` | dict with `OptOut` = `true`. **Required for this project.** |
+
+(Corrected 2026-09-23. An earlier version listed a bare `OptOut` here, which the SDK ignores.)
 
 Top level:
 
@@ -112,7 +115,8 @@ missing entirely.
 ## SPM modules
 
 `https://github.com/facebook/meta-wearables-dat-ios` at 0.9.0.
-Modules: `MWDATCore`, `MWDATCamera`, `MWDATDisplay`, `MWDATMockDevice`.
+Tag is `0.9.0` (no `v`). Products: `MWDATCore`, `MWDATCamera`, `MWDATDisplay`,
+`MWDATMockDevice`, `MWDATMockDeviceTestClient`. Binary xcframeworks, device + simulator.
 
 Deployment target: iOS 16.0+ per `AGENTS.md`. `SnapCountCore` requires iOS 18 for the modern
 Vision API, so the app target is effectively **iOS 18+**.
@@ -169,8 +173,8 @@ registration either succeeds or it does not.
 
 ## Gotchas worth pinning to the wall
 
-1. **Developer Mode must be re-enabled after a firmware update.** You are about to update
-   firmware. Expect to redo the five-tap.
+1. **Developer Mode must be re-enabled after a firmware update.** It survived the V128 update
+   this time, but check after any future update.
 2. **Registration requires internet.** Do it on land. This is the single biggest pre-trip risk.
 3. **Only one third-party app can be registered at a time** in developer mode.
 4. **Lower resolution and frame rate give *better* image quality**, because there is less
@@ -185,5 +189,5 @@ Meta hosts a public docs MCP endpoint, no auth required:
 https://mcp.developer.meta.com/wearables
 ```
 
-Worth adding, since the SDK is pre-1.0 and churning. It would let us query current API
+Added and approved at project scope. Sessions get `search_dat_docs` for querying current API
 behaviour instead of relying on notes that go stale.

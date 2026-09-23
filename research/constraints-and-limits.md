@@ -64,8 +64,8 @@ Check versions before debugging anything else. See `setup-developer-mode.md`.
 
 ## Registration does not equal permission
 
-Two separate steps on the native path. A successful registration grants nothing. Camera and mic
-still need a user prompt in the Meta AI app ("Allow once" vs "Allow always"), and the permission has
+Two separate steps on the native path. A successful registration grants nothing. Camera access
+still needs a user prompt in the Meta AI app ("Allow once" vs "Allow always"), and the permission has
 to be declared on the Developer Center project first. Permission-denied paths need building and
 testing even in development.
 

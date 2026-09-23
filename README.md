@@ -53,5 +53,5 @@ Several were resolved on 2026-09-22. See `snapcount/research/dat-api-findings.md
    native apps. `Button` has tap handlers. Whether raw swipe/pinch is exposed is still unknown.
 4. ~~Full iOS permission enum~~ **RESOLVED**: `Permission` has exactly one case, `.camera`.
 5. ~~Camera stream data path~~ **RESOLVED**: local Wi-Fi via Bonjour, or BLE without streaming.
-   Image data does not transit Meta's cloud. But SDK telemetry is on by default and must be
-   disabled with `OptOut = true`.
+   Image data does not transit Meta's cloud. But SDK analytics and crash reporting are on by
+   default and must each be disabled with a nested `OptOut` (see `snapcount/docs/info-plist.md`).

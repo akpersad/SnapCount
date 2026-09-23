@@ -37,7 +37,7 @@ is invisible, and it removes all latency pressure from the camera pipeline.
 | Face detection | Apple Vision | Free, on-device, no model to ship |
 | Face identity | **AdaFace IR-18** via Core ML | No Apple identity API exists; feature prints are too weak for children. AdaFace beats ArcFace on mixed-quality images, which is what candid shots of a moving child are. |
 | Glasses HUD | Text and icons only, no images | `Image` loads from URL; avoiding it keeps everything local |
-| Meta telemetry | Off | `OptOut = true`, plus crash reporting |
+| Meta telemetry | Off | `MWDAT > Analytics > OptOut` and `MWDAT > CrashReporting > OptOut`, enforced at launch |
 | Photo storage | App container, excluded from backup | Keeps biometric data out of iCloud |
 
 ## Build order
@@ -50,12 +50,17 @@ quantity and the 0.9 preview SDK is the **unknown** one. So the recognition pipe
 first, as a plain iOS app testable at a desk with no glasses. The glasses bolt on last as a
 display and trigger layer. If DAT falls through, this still lands as a working phone app.
 
-Steps 1-3 need nothing from Meta. Step 4 is blocked on a Developer Center project.
+Phases 1 to 4 need nothing from Meta. The Developer Center project is done, so nothing is
+blocked on Meta.
 
 ## Layout
 
 - `SnapCountCore/` - the recognition pipeline, as a Swift package. Builds and tests from the
-  command line with no Xcode project, no glasses, and no Developer Center account.
+  command line with no Xcode project, no glasses, and no Developer Center account. Also holds
+  the `snapcount-enroll` CLI.
+- `SnapCount/` - the iOS app (sources, `Info.plist`, assets).
+- `project.yml` - XcodeGen spec. `SnapCount.xcodeproj` is generated from it and gitignored.
+- `Scripts/fetch-model.sh` - downloads the AdaFace model into `Models/` (gitignored).
 - `research/dat-api-findings.md` - the 0.9 API surface, verified 2026-09-22
 - `research/face-recognition-approach.md` - model choice and the child-accuracy problem
 - `docs/privacy-architecture.md` - the no-egress checklist
@@ -63,9 +68,14 @@ Steps 1-3 need nothing from Meta. Step 4 is blocked on a Developer Center projec
 ## Running it
 
 ```
-swift build --package-path SnapCountCore
-swift test  --package-path SnapCountCore
+Scripts/fetch-model.sh                      # once per clone
+swift test --package-path SnapCountCore     # core + model tests
+xcodegen generate --spec project.yml        # then open SnapCount.xcodeproj, or:
+xcodebuild -project SnapCount.xcodeproj -scheme SnapCount \
+  -destination 'generic/platform=iOS Simulator' build
 ```
+
+The app build needs `Secrets.xcconfig` (copy `Secrets.xcconfig.template`).
 
 Note: this repo's shell has a `cd` override in `~/.bash_profile` that returns non-zero in
 non-interactive shells, which silently breaks `cd x && y`. Use absolute paths or
@@ -109,7 +119,7 @@ the capture-quality filter has almost certainly dropped the face anyway.
    change fast. Threshold must be tuned on real data. Bias toward precision.
 2. **Battery.** Photo capture appears to require a running stream. An all-day capture mode
    may be expensive. Unmeasured.
-3. **Timeline.** Roughly six days, from zero, on a pre-1.0 SDK. Steps 1-3 are realistic.
-   4-6 depend on how cleanly registration goes.
+3. **Timeline.** Departure is the week of 2026-09-28, on a pre-1.0 SDK. Phases 1-4 are
+   phone-only and within reach. Phases 5-6 depend on how cleanly registration goes.
 4. ~~**coremltools vs Python 3.14.**~~ Resolved: a pre-converted model is used, so no Python
    toolchain is needed.
