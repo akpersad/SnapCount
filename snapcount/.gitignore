@@ -1,0 +1,11 @@
+.build/
+.swiftpm/
+DerivedData/
+*.xcuserstate
+
+# Never commit biometric data or reference photographs.
+enrollment.json
+Enrollment/
+ReferencePhotos/
+*.mlmodel
+*.mlpackage

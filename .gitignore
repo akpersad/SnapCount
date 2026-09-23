@@ -1,0 +1,36 @@
+# ============================================================================
+# BIOMETRIC AND PERSONAL DATA - NEVER COMMIT, NEVER UPLOAD
+# ============================================================================
+# Reference photographs of a child. These exist only to compute enrollment
+# embeddings locally and are deleted afterwards. They must never reach a remote.
+ReferencePhotos/
+**/ReferencePhotos/
+*.HEIC
+*.heic
+*.jpg
+*.jpeg
+*.png
+!docs/**/*.png
+
+# Computed enrollment data is biometric too, even though it is not an image.
+enrollment.json
+**/enrollment.json
+Enrollment/
+
+# ============================================================================
+# Secrets
+# ============================================================================
+# ClientToken in particular must not be committed. Use the .template file.
+Secrets.xcconfig
+*.local.plist
+
+# ============================================================================
+# Build artifacts
+# ============================================================================
+.build/
+.swiftpm/
+DerivedData/
+*.xcuserstate
+*.mlmodel
+*.mlpackage
+.DS_Store
