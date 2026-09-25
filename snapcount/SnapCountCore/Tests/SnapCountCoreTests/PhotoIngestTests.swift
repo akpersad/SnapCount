@@ -81,3 +81,54 @@ struct PhotoIngestTests {
         #expect(try store.load(for: person).records.map(\.id) == ["new"])
     }
 }
+
+struct CaptureStoreTests {
+
+    static func temporaryStore() -> CaptureStore {
+        CaptureStore(directory: FileManager.default.temporaryDirectory
+            .appendingPathComponent("captures-\(UUID().uuidString)", isDirectory: true))
+    }
+
+    @Test("A saved capture is listed for its day, with its time, and resolves back to its file")
+    func roundTrip() throws {
+        let store = Self.temporaryStore()
+        defer { try? FileManager.default.removeItem(at: store.directory) }
+        let takenAt = PhotoIngestTests.today
+
+        let id = try store.save(Data([1, 2, 3]), capturedAt: takenAt)
+        let assets = store.assets(on: takenAt)
+
+        #expect(assets.map(\.id) == [id])
+        #expect(assets.first?.source == .glasses)
+        #expect(abs(assets.first!.createdAt.timeIntervalSince(takenAt)) < 0.001)
+        #expect(store.assets(on: PhotoIngestTests.yesterday).isEmpty)
+        #expect(try Data(contentsOf: #require(store.fileURL(for: id))) == Data([1, 2, 3]))
+    }
+
+    @Test("Capture files are excluded from backup")
+    func excludedFromBackup() throws {
+        let store = Self.temporaryStore()
+        defer { try? FileManager.default.removeItem(at: store.directory) }
+        let url = try #require(store.fileURL(for: store.save(Data([0]))))
+        #expect(try url.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true)
+    }
+
+    @Test("Library IDs and path tricks do not resolve to capture files")
+    func rejectsForeignIDs() {
+        let store = Self.temporaryStore()
+        #expect(store.fileURL(for: "ABC-123/L0/001") == nil)
+        #expect(store.fileURL(for: "glasses/../records.json") == nil)
+    }
+
+    @Test("Captures are planned alongside library photos, and never removed as deleted")
+    func plannedWithLibrary() {
+        let day = PhotoIngestTests.today
+        let capture = LibraryAsset(id: "glasses/1-a.jpg", createdAt: day, source: .glasses)
+        let photo = LibraryAsset(id: "lib", createdAt: day.addingTimeInterval(5))
+        let analyzedCapture = PhotoIngestTests.record("glasses/0-b.jpg", source: .glasses)
+
+        let plan = IngestPlan(assets: [photo, capture], existing: [analyzedCapture], day: day)
+        #expect(plan.toAnalyze.map(\.id) == ["glasses/1-a.jpg", "lib"])
+        #expect(plan.removedIDs.isEmpty)
+    }
+}

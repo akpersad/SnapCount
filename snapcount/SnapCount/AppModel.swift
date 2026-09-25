@@ -14,6 +14,7 @@ final class AppModel {
     private(set) var enrollmentStatus: Status = .checking
 
     let library = LibraryIngest()
+    let glasses = GlassesController()
 
     /// The one person being counted, if enrollment is valid for the current model.
     var person: EnrolledPerson? {
@@ -23,7 +24,10 @@ final class AppModel {
         return enrollment.people.first
     }
 
+    /// Runs from the first screen's `.task`, which is after `PrivacyChecks` in `SnapCountApp.init`.
+    /// Not from `init`: `@State` initializers run before the App's `init` body.
     func load() async {
+        configureGlassesOnce()
         if embedder == nil {
             do {
                 embedder = try await RecognitionModel.loadEmbedder()
@@ -33,6 +37,34 @@ final class AppModel {
             }
         }
         reloadEnrollment()
+    }
+
+    private var glassesConfigured = false
+
+    private func configureGlassesOnce() {
+        guard !glassesConfigured else { return }
+        glassesConfigured = true
+        glasses.configure()
+        glasses.onPhoto = { [weak self] data in try self?.library.addCapture(data) }
+        observeHUD()
+    }
+
+    /// The Meta AI app can relaunch SnapCount through its URL before the first screen appears,
+    /// so this configures the SDK itself if needed. `PrivacyChecks` has run by then either way.
+    func handle(_ url: URL) async {
+        configureGlassesOnce()
+        await glasses.handle(url)
+    }
+
+    /// Keeps the glasses HUD in step with the count. Re-arms itself after every change.
+    private func observeHUD() {
+        // Only the inputs are read inside tracking, so the HUD's own state cannot re-trigger it.
+        let (count, name, checking) = withObservationTracking {
+            (library.todayCount, person?.displayName, library.isScanning)
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.observeHUD() }
+        }
+        glasses.updateHUD(count: count, name: name, checking: checking)
     }
 
     func save(_ person: EnrolledPerson) throws {

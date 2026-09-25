@@ -71,29 +71,33 @@ public struct PhotoRecordStore: Sendable {
     }
 }
 
-/// A photo library asset reduced to what ingest planning needs. Keeps PhotoKit out of the
-/// core so the planning rules are testable.
+/// A photo waiting to be counted, from either source, reduced to what ingest planning needs.
+/// Keeps PhotoKit out of the core so the planning rules are testable.
 public struct LibraryAsset: Sendable, Equatable {
     public let id: String
     public let createdAt: Date
+    public let source: PhotoSource
 
-    public init(id: String, createdAt: Date) {
+    public init(id: String, createdAt: Date, source: PhotoSource = .photoLibrary) {
         self.id = id
         self.createdAt = createdAt
+        self.source = source
     }
 }
 
-/// Decides which library photos still need analyzing and which records are stale.
+/// Decides which photos still need analyzing and which records are stale. Glasses captures
+/// are saved as files by `CaptureStore` and planned exactly like library assets, so they get
+/// the same retry and re-enrollment behaviour for free.
 ///
 /// Record IDs are the dedupe key across sources. Library records use the asset's
-/// `localIdentifier`. If a glasses capture is ever saved to the library (Phase 5d), its record
-/// must take the new asset's `localIdentifier` as its ID, and ingest will then skip it here
-/// rather than count the same photo twice.
+/// `localIdentifier`; glasses captures use `glasses/<file name>`. If an "export to Photos"
+/// action is ever added, it must also write a record under the new asset's `localIdentifier`
+/// (copying the capture's verdict), or the exported copy will be counted a second time.
 public struct IngestPlan: Sendable, Equatable {
     /// Assets with no record yet, oldest first so the count climbs in the order photos were taken.
     public let toAnalyze: [LibraryAsset]
     /// Library records whose asset is gone from today's library, usually because the photo was
-    /// deleted. Glasses records are never removed here.
+    /// deleted. Glasses records are never removed here: their files are never deleted by the app.
     public let removedIDs: Set<String>
 
     public init(assets: [LibraryAsset], existing: [PhotoRecord], day: Date, calendar: Calendar = .current) {
@@ -102,7 +106,7 @@ public struct IngestPlan: Sendable, Equatable {
             .filter { !known.contains($0.id) }
             .sorted { $0.createdAt < $1.createdAt }
 
-        let present = Set(assets.map(\.id))
+        let present = Set(assets.filter { $0.source == .photoLibrary }.map(\.id))
         removedIDs = Set(existing
             .filter { $0.source == .photoLibrary && calendar.isDate($0.capturedAt, inSameDayAs: day) }
             .map(\.id)

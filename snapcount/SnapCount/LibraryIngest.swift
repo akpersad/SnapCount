@@ -4,12 +4,13 @@ import Photos
 import UIKit
 import SnapCountCore
 
-/// Counts today's phone photos (WORKPLAN Phase 4). Enumerates the library, runs every photo
-/// without a record through the same `PhotoAnalyzer` the glasses captures will use, and keeps
-/// the results in a `PhotoRecordStore` so each photo is analyzed once.
+/// Counts today's photos from both sources (WORKPLAN Phases 4 and 5d). Enumerates the photo
+/// library and the glasses captures in `CaptureStore`, runs every photo without a record
+/// through one `PhotoAnalyzer`, and keeps the results in a `PhotoRecordStore` so each photo is
+/// analyzed once.
 ///
-/// Reruns whenever the library changes, the app returns to the foreground, or the day rolls
-/// over, so a new photo lands in the count within seconds of being taken while the app is open.
+/// Reruns whenever the library changes, a capture arrives, the app returns to the foreground,
+/// or the day rolls over, so a new photo lands in the count within seconds.
 @MainActor
 @Observable
 final class LibraryIngest {
@@ -31,6 +32,7 @@ final class LibraryIngest {
     private var analyzer: PhotoAnalyzer?
     private var person: EnrolledPerson?
     private var store: PhotoRecordStore?
+    private let captures: CaptureStore? = try? CaptureStore(directory: CaptureStore.defaultDirectory())
     private var scanTask: Task<Void, Never>?
     private var rescanRequested = false
     private var observer: LibraryObserver?
@@ -85,13 +87,20 @@ final class LibraryIngest {
     func requestScan() {
         guard analyzer != nil else { return }
         refreshAccess()
-        guard access == .full || access == .limited else { return }
         if scanTask != nil {
             rescanRequested = true
             return
         }
         let generation = generation
         scanTask = Task { await runScans(generation) }
+    }
+
+    /// Keeps a glasses capture and counts it. The file is written before anything else, so a
+    /// photo is never lost even if analysis fails or no one is enrolled yet.
+    func addCapture(_ data: Data, capturedAt: Date = Date()) throws {
+        guard let captures else { throw CocoaError(.fileWriteUnknown) }
+        try captures.save(data, capturedAt: capturedAt)
+        requestScan()
     }
 
     func clearRecords() {
@@ -150,10 +159,17 @@ final class LibraryIngest {
     private func scanOnce(_ generation: Int) async {
         guard let analyzer, let person, let store else { return }
         let day = Date()
-        let worker = LibraryWorker()
-        let assets = await worker.assets(on: day)
+        let worker = LibraryWorker(captures: captures)
+        let libraryReadable = access == .full || access == .limited
+        let libraryAssets = libraryReadable ? await worker.assets(on: day) : []
         guard generation == self.generation else { return }
-        let plan = IngestPlan(assets: assets, existing: records, day: day)
+        let captureAssets = captures?.assets(on: day) ?? []
+        // Without library access, leave library records out of the plan so they are not
+        // mistaken for deleted photos.
+        let plan = IngestPlan(
+            assets: libraryAssets + captureAssets,
+            existing: libraryReadable ? records : records.filter { $0.source != .photoLibrary },
+            day: day)
 
         if !plan.removedIDs.isEmpty {
             records.removeAll { plan.removedIDs.contains($0.id) }
@@ -200,6 +216,8 @@ final class LibraryIngest {
 /// The PhotoKit side, kept off the main actor. Works in `localIdentifier` strings because
 /// `PHAsset` is not `Sendable`.
 struct LibraryWorker: Sendable {
+    let captures: CaptureStore?
+
     enum Outcome: Sendable {
         case record(PhotoRecord)
         case notOnDevice
@@ -233,10 +251,17 @@ struct LibraryWorker: Sendable {
         with analyzer: PhotoAnalyzer,
         target: EnrolledPerson
     ) async -> Outcome {
-        guard let data = await imageData(for: asset.id) else { return .notOnDevice }
+        let data: Data?
+        switch asset.source {
+        case .photoLibrary:
+            data = await imageData(for: asset.id)
+        case .glasses:
+            data = captures?.fileURL(for: asset.id).flatMap { try? Data(contentsOf: $0) }
+        }
+        guard let data else { return asset.source == .photoLibrary ? .notOnDevice : .failed }
         guard let image = ImageLoading.image(from: data),
               let record = try? await analyzer.analyze(
-                image: image, id: asset.id, source: .photoLibrary,
+                image: image, id: asset.id, source: asset.source,
                 capturedAt: asset.createdAt, target: target)
         else { return .failed }
         return .record(record)

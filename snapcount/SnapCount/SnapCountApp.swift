@@ -14,6 +14,9 @@ struct SnapCountApp: App {
         WindowGroup {
             ContentView()
                 .environment(app)
+                .onOpenURL { url in
+                    Task { await app.handle(url) }
+                }
         }
     }
 }

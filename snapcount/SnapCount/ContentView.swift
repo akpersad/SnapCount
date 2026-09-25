@@ -13,12 +13,16 @@ struct ContentView: View {
                 if let person = app.person {
                     TodaySection(library: app.library, person: person)
                 }
+                GlassesSection(glasses: app.glasses)
                 Section {
                     StatusRow(title: "Recognition model", status: app.modelStatus)
                     NavigationLink {
                         EnrollmentView()
                     } label: {
                         StatusRow(title: "Enrollment", status: app.enrollmentStatus)
+                    }
+                    NavigationLink("Privacy Check") {
+                        PrivacyCheckView()
                     }
                 } footer: {
                     Text("Everything runs on this iPhone. No photos or face data leave the device.")

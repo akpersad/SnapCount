@@ -4,13 +4,15 @@
 immediately. Read this first; it should make re-reading the research files unnecessary for
 most tasks.
 
-Last updated: 2026-09-24 (enrolled and tuned on the phone; Phase 4 verified on device)
+Last updated: 2026-09-24 (Phases 5 and 6 built; Phase 7 self-check and test script added)
 
-**Next session starts here (2026-09-24):** Enrollment is done on the phone and tuned (the
-default-cutoff note is gone; the results screen showed nothing suspicious). The live library
-count works on device. Mac copies of her photos and the CLI's test `enrollment.json` were
-deleted. **Next: Phase 5** (5a registration needs internet, do it on land before 2026-09-28),
-then **6**, then the Phase 7 airplane-mode and egress checks. 3e stays minimal.
+**Next session starts here (2026-09-24):** Phases 5 and 6 are **built but untested on
+hardware**. The simulator confirms the SDK configures at launch and the registration button
+appears; nothing past that can run without the glasses. **Next: the user runs
+`snapcount/docs/pre-trip-checklist.md` on the phone and glasses, on land, before 2026-09-28.**
+Fix whatever it turns up. Watch for: registration bouncing back through `snapcount://`,
+the captured photo's pixel size (reported on the phone), whether capture works with the phone
+locked, and airplane mode. 3e stays minimal.
 
 ---
 
@@ -44,14 +46,14 @@ Test every feature in airplane mode.
 | Meta AI app version | **289.0.0.21.157** - clears the V282 floor |
 | Wearables Developer Center org | Done |
 | Wearables Developer Center project | **Done.** MetaAppID + ClientToken in `Secrets.xcconfig` |
-| Recognition core (`SnapCountCore`) | **Done, 38 tests passing** |
+| Recognition core (`SnapCountCore`) | **Done, 42 tests passing** |
 | Core ML embedding model | **Done.** AdaFace IR-18 fetched, checksum pinned, same-vs-different check passes |
 | Enrollment + tuning CLI | **Done.** `snapcount-enroll`, waiting on photos. Optional now that the app tunes on-device |
 | Enrollment | **Done on the phone, tuned** (2026-09-24). Mac copies deleted |
 | Xcode app target | **Done.** Generated from `snapcount/project.yml`; builds and runs in the simulator. First physical-iPhone build succeeded (2026-09-24) |
 | PhotoKit ingest (Phase 4) | **Done, verified on device.** Live count updates within seconds of a new photo |
-| DAT integration | Not started |
-| Glasses HUD | Not started |
+| DAT integration (Phase 5) | **Built, untested on hardware.** `GlassesController` |
+| Glasses HUD (Phase 6) | **Built, untested on hardware** |
 | Git remote | `git@github.com-personal:akpersad/SnapCount.git`, pushed |
 | Docs MCP | **Done.** Approved; `search_dat_docs` tool available in sessions |
 
@@ -70,7 +72,9 @@ Recorded so they are not re-litigated. Each has a reason; revisit only if the re
 | Apple Vision for detection | Free, on-device, Neural Engine, no model to ship. |
 | **AdaFace IR-18** via Core ML for identity | No Apple face-identity API exists. Vision feature prints are too weak to separate one young child from another. AdaFace's quality-adaptive margin beats ArcFace by ~11% on mixed-quality images, which is exactly what candid shots of a moving child are. |
 | Align crops on eye landmarks, not Vision `roll` | Matches the model's expected preprocessing, and avoids Vision's undocumented roll sign convention. |
-| Glasses HUD is text and icons only | The `Image` component loads from a URL, which would mean running a local HTTP server. |
+| Glasses HUD is text and icons only | Glanceable, and cheap to re-send in full. (0.9 does have `Image(image: UIImage)`, so the earlier "needs a local HTTP server" reason no longer holds; text-only stays on its own merits.) |
+| Glasses capture is **on demand**: add camera, start stream, capture, stop camera | In 0.9 `capturePhoto` needs a running stream. All-day streaming would drain the glasses. |
+| Glasses photos are **files in the app container**, not the Photos library | Keeps them out of iCloud Photos (privacy doc, section 5). They are scanned like library assets, so retry, dedupe, and re-enrollment rescoring come free. The app never deletes them. |
 | Recognition runs async, off the capture path | A few seconds of lag is invisible and it removes all latency pressure from the camera pipeline. |
 | Secrets in gitignored `Secrets.xcconfig` | One pattern for all identifiers beats case-by-case judgement about which are sensitive. |
 | `ReferencePhotos/` ignored with **zero exceptions** | An ignore rule protecting a child's photos should have no carve-outs. Guidance lives in `docs/` instead. |
@@ -165,6 +169,7 @@ Xcode project, no glasses, and no Developer Center account. **33 tests passing.*
 | `EnrollmentStore.swift` | `EnrolledPerson`, JSON persistence, backup exclusion, `Enroller`, `EmbeddedFace` |
 | `EnrollmentEvaluator.swift` | Centroid + leave-one-out tuning over embeddings. Shared by the app and the CLI |
 | `PhotoAnalyzer.swift` | Per-photo orchestration, `DailyTally` |
+| `CaptureStore.swift` | Glasses photos as backup-excluded files; time in the file name; IDs `glasses/<name>` |
 | `PhotoRecordStore.swift` | `RecordLog` persistence (tied to the enrollment fingerprint, 30-day retention, no backup), `IngestPlan` |
 | `ThresholdTuner.swift` | Precision-first threshold sweep, midpoint of the best-recall plateau |
 | `AdaFace.swift` | Verified model contract (`AdaFaceIR18`), compiles `.mlpackage` on the fly |
@@ -255,12 +260,24 @@ library.
 
 ---
 
-### Phase 5: DAT integration  [UNBLOCKED]
+### Phase 5: DAT integration  [BUILT, untested on hardware]
 
-- [ ] **5a.** `Wearables.configure()`, `startRegistration()`, `.onOpenURL` callback handling.
-- [ ] **5b.** Request `.camera` permission; build and test the denied path.
-- [ ] **5c.** `DeviceSession`, `addCamera`, `photoDataPublisher`, `capturePhoto(.jpeg)`.
-- [ ] **5d.** Feed captures into `PhotoAnalyzer`.
+All in `SnapCount/GlassesController.swift` (no SwiftUI import: `MWDATDisplay` names clash),
+phone controls in `GlassesSection.swift`. API taken from the 0.9 `.swiftinterface` files, not
+the docs site, which already shows a newer camera API (`camera.photo`).
+
+- [x] **5a.** `Wearables.configure()` from `AppModel.load()` (after `PrivacyChecks`; `@State`
+      initializers run before `App.init`, so not from `AppModel.init`). Registration via
+      `startRegistration()`; `.onOpenURL` calls `handleUrl`, configuring first if a cold launch
+      arrives by URL. Registration and device lists observed via their streams.
+- [x] **5b.** `checkPermissionStatus(.camera)`, then `requestPermission` if needed. Denied shows
+      a message and leaves the session idle. *Denied path needs a device test.*
+- [x] **5c.** `createSession(AutoDeviceSelector)`; state and error streams observed before
+      `start()`. Per capture: `addCamera()` (nil until `.started`), listeners on, `stream.start()`,
+      `capturePhoto(.jpeg)` on the first `.streaming`, first photo or error or 30 s timeout wins,
+      `camera.stop()`. One capture in flight at a time.
+- [x] **5d.** Photo bytes go to `CaptureStore` via `LibraryIngest.addCapture`, then the normal
+      scan analyzes them. Scans no longer need photo-library access to count captures.
 
 *Acceptance:* pinch on glasses produces a photo that lands in the tally.
 
@@ -268,11 +285,14 @@ library.
 
 ---
 
-### Phase 6: Glasses HUD
+### Phase 6: Glasses HUD  [BUILT, untested on hardware]
 
-- [ ] **6a.** `session.addDisplay()`, `FlexBox` + `Text` + `Icon` showing the count.
-- [ ] **6b.** `Button` with tap handler to trigger capture.
-- [ ] **6c.** Re-send the full view on count change.
+- [x] **6a.** On session `.started`, if the device `supportsDisplay()`: `addDisplay()`,
+      `display.start()`, send on `.started`. Count (heading), "photos of <name> today", a status
+      line while capturing or checking.
+- [x] **6b.** `Button("Take photo", iconName: .fourCornerFrame)` calls `capture()`.
+- [x] **6c.** `AppModel.observeHUD()` tracks count, name, and scanning; `updateHUD` re-sends
+      the whole view, coalescing bursts into one follow-up send.
 
 *Acceptance:* count visible on glasses, updates within seconds of a capture.
 
@@ -281,9 +301,14 @@ library.
 ### Phase 7: Harden and verify  [MUST COMPLETE BEFORE DEPARTURE]
 
 - [x] Analytics and crash reporting opt-outs in the plist, enforced at launch by `PrivacyChecks`
-- [ ] Opt-outs confirmed by proxy on a real device (covered by the egress check below)
-- [ ] Proxy a full capture session, confirm **zero unexpected egress**
-- [ ] Confirm enrollment data and `records.json` excluded from backup
+Step-by-step procedure: **`snapcount/docs/pre-trip-checklist.md`**. In-app **Privacy Check**
+screen (`PrivacyCheckView`) verifies the storage items against real file attributes.
+
+- [ ] Opt-outs confirmed on a real device (App Privacy Report, checklist section 4)
+- [ ] Full capture session shows **zero unexpected egress** (App Privacy Report replaces the
+      proxy: same answer, no certificate setup)
+- [ ] Privacy Check screen all green on the phone (enrollment, records, captures excluded from
+      backup; enrollment `.complete` protection)
 - [x] If the CLI was used, delete `ReferencePhotos/` after enrollment is verified (done 2026-09-24) (in-app
       enrollment reads the user's own library through the picker and copies nothing)
 - [ ] **Airplane-mode end-to-end test** (proves both the privacy claim and sea readiness)
@@ -300,7 +325,9 @@ library.
 | 2 | ~~Does camera permission work with `MetaAppID = 0`?~~ **MOOT.** A real `MetaAppID` was issued and camera permission is declared and toggled on. | Done | none |
 | 6 | ~~AdaFace feature names and normalization?~~ **RESOLVED.** `face_image` (BGR) to `embedding`; [-1, 1] normalization is inside the graph. See 2a. | Done | none |
 | 7 | Pretrained-weight licensing. The AdaFace repo is MIT, but the weights derive from datasets with research-use restrictions. | Fine for a personal, undistributed app. Needs a real answer before any release. Distribution is closed during the preview anyway. | Distribution only |
-| 3 | Does photo capture require a **started** stream? The API does require a `Stream` (capture is `stream.capturePhoto`), but whether `stream.start()` must be running is untested. | Test on device in 5c. Determines whether all-day capture is battery-viable. | Phase 5c, battery item in 7 |
+| 3 | ~~Does photo capture require a started stream?~~ **Docs say yes** ("when a stream session is active, call `capturePhoto`"). Built as on-demand start/capture/stop per photo. | Confirm capture latency on device | none |
+| 9 | Does capture work with the phone **locked** in a pocket? Depends on whether the background modes keep the session alive. | Checklist section 2, step 6 | Usability, not correctness |
+| 10 | What **pixel size** do 0.9 photo captures come back at with the default `StreamConfiguration`? | Shown on the phone after each capture | Recognition range for glasses photos |
 | 8 | ~~How does the tuned threshold reach the phone?~~ **RESOLVED: (a).** The app takes a negatives set and tunes on-device with the same `EnrollmentEvaluator` the CLI uses. No Mac or file transfer needed. | Done | none |
 | 4 | Are raw swipe/pinch events exposed, or only `Button` taps? | Button taps are sufficient, so this is informational. | none |
 | 5 | Is text input available on device? | Not needed by this app. | none |
