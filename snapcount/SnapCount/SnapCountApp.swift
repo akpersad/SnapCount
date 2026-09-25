@@ -2,6 +2,8 @@ import SwiftUI
 
 @main
 struct SnapCountApp: App {
+    @State private var app = AppModel()
+
     init() {
         // Before anything else, and in particular before the Meta SDK is configured. If the
         // opt-outs are missing, the SDK would start reporting on first use.
@@ -11,6 +13,7 @@ struct SnapCountApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(app)
         }
     }
 }

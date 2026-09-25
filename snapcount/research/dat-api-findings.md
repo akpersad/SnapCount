@@ -80,6 +80,7 @@ let config = StreamConfiguration(
     resolution: .low,
     frameRate: 24)
 guard let camera = try session.addCamera(config: config) else { return }
+let stream = camera.stream
 
 _ = stream.photoDataPublisher.listen { photoData in
     let data = photoData.data   // raw bytes, straight into our process

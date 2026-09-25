@@ -4,7 +4,14 @@
 immediately. Read this first; it should make re-reading the research files unnecessary for
 most tasks.
 
-Last updated: 2026-09-23 (Phase 3a-3c done: app builds and runs; opt-out plist structure corrected)
+Last updated: 2026-09-24 (Phase 3d built: on-device enrollment and tuning from the photo picker; open question 8 resolved)
+
+**Next session starts here (2026-09-24):** Phase 3d is built but not yet exercised on a real
+iPhone; the user is doing the first device build now. Suggested order from here, given the
+departure date: **Phase 4** (PhotoKit ingest, since most cruise photos are phone photos), then
+**5** and **6**, with **3e** kept minimal. 5a registration needs internet, so it must happen
+on land, followed by the Phase 7 airplane-mode and egress checks. Phases 3d, the doc pass, and
+this note are uncommitted unless git says otherwise.
 
 ---
 
@@ -38,11 +45,11 @@ Test every feature in airplane mode.
 | Meta AI app version | **289.0.0.21.157** - clears the V282 floor |
 | Wearables Developer Center org | Done |
 | Wearables Developer Center project | **Done.** MetaAppID + ClientToken in `Secrets.xcconfig` |
-| Recognition core (`SnapCountCore`) | **Done, 27 tests passing** |
+| Recognition core (`SnapCountCore`) | **Done, 33 tests passing** |
 | Core ML embedding model | **Done.** AdaFace IR-18 fetched, checksum pinned, same-vs-different check passes |
-| Enrollment + tuning CLI | **Done.** `snapcount-enroll`, waiting on photos |
-| Enrollment photos | Not provided |
-| Xcode app target | **Done.** Generated from `snapcount/project.yml`; builds and runs in the simulator. Not yet run on a physical iPhone |
+| Enrollment + tuning CLI | **Done.** `snapcount-enroll`, waiting on photos. Optional now that the app tunes on-device |
+| Enrollment photos | Not provided. Can now be picked directly on the phone (3d) |
+| Xcode app target | **Done.** Generated from `snapcount/project.yml`; builds and runs in the simulator. First physical-iPhone build in progress (2026-09-24) |
 | DAT integration | Not started |
 | Glasses HUD | Not started |
 | Git remote | `git@github.com-personal:akpersad/SnapCount.git`, pushed |
@@ -70,6 +77,7 @@ Recorded so they are not re-litigated. Each has a reason; revisit only if the re
 | XcodeGen; `.xcodeproj` generated and gitignored | A readable `project.yml` diffs and reviews cleanly, and a hand-edited `.pbxproj` is where unreviewable config drift hides. |
 | Privacy config **fails closed** at launch | The opt-out keys are easy to get subtly wrong (this project already did once). A crash at launch beats an app that quietly reports home. |
 | Tuner picks the **middle** of the best-recall threshold range | The low edge hugs the worst impostor in a small tuning set, so the first unseen child scoring slightly higher gets counted. |
+| Enrollment and tuning run **on the phone**, from `PhotosPicker` | No Mac, no file transfer, re-enrollable at sea. The CLI shares the same `EnrollmentEvaluator`, so the two cannot disagree. (Open question 8.) |
 
 ---
 
@@ -111,7 +119,8 @@ Inside an `MWDAT` dictionary: `AppLinkURLScheme`, `MetaAppID`, `ClientToken`, `T
 Top level: `CFBundleURLTypes`, `UIBackgroundModes` (`bluetooth-peripheral` **and**
 `external-accessory`), `UISupportedExternalAccessoryProtocols` (`com.meta.ar.wearable`),
 `NSBluetoothAlwaysUsageDescription`, `NSLocalNetworkUsageDescription`, `NSBonjourServices`
-(`_bonjour._tcp`), `NSCameraUsageDescription`.
+(`_bonjour._tcp`), `NSCameraUsageDescription`, `NSPhotoLibraryUsageDescription` (Apple, for
+Phase 4 PhotoKit; `PhotosPicker` enrollment does not need it).
 
 ### Environment
 - Xcode 27, Swift 6.4, iOS 27 SDK, macOS 26.7
@@ -143,19 +152,20 @@ unblocked on the Meta side.
 ### Phase 1: Recognition core  [DONE]
 
 `snapcount/SnapCountCore`, a Swift package that builds and tests from the command line with no
-Xcode project, no glasses, and no Developer Center account. **27 tests passing.**
+Xcode project, no glasses, and no Developer Center account. **33 tests passing.**
 
 | File | Role |
 |---|---|
 | `Models.swift` | `FaceEmbedding` (cosine, centroid), `DetectedFace`, `PhotoRecord` |
 | `FaceDetector.swift` | Vision detection, quality/size/yaw filters, landmark alignment |
 | `FaceEmbedder.swift` | Protocol, Vision feature-print fallback, Core ML implementation |
-| `EnrollmentStore.swift` | `EnrolledPerson`, JSON persistence, backup exclusion, `Enroller` |
+| `EnrollmentStore.swift` | `EnrolledPerson`, JSON persistence, backup exclusion, `Enroller`, `EmbeddedFace` |
+| `EnrollmentEvaluator.swift` | Centroid + leave-one-out tuning over embeddings. Shared by the app and the CLI |
 | `PhotoAnalyzer.swift` | Per-photo orchestration, `DailyTally` |
 | `ThresholdTuner.swift` | Precision-first threshold sweep, midpoint of the best-recall plateau |
 | `AdaFace.swift` | Verified model contract (`AdaFaceIR18`), compiles `.mlpackage` on the fly |
 | `ImageLoading.swift` | EXIF-upright, 2048 px-bounded decode. Use it for PhotoKit data too |
-| `snapcount-enroll/main.swift` | CLI for 2b + 2c |
+| `snapcount-enroll/main.swift` | Desk-side CLI for 2b + 2c over `ReferencePhotos/` |
 
 ```
 swift build --package-path snapcount/SnapCountCore
@@ -164,7 +174,7 @@ swift test  --package-path snapcount/SnapCountCore
 
 ---
 
-### Phase 2: Model and enrollment  [2a DONE; 2b/2c tooling done, blocked on photos]
+### Phase 2: Model and enrollment  [2a DONE; 2b/2c tooling done in app and CLI, waiting on photos]
 
 - [x] **2a. Fetch and wire the AdaFace IR-18 Core ML model.** Done. Checksum pinned in
       `fetch-model.sh`. Contract, read from the compiled graph (not guessed):
@@ -173,7 +183,9 @@ swift test  --package-path snapcount/SnapCountCore
       Encoded in `AdaFaceIR18`. Sanity check on public-domain official portraits
       (`snapcount/Models/SanityFaces/`, gitignored): same-person 0.67-0.72, worst
       different-person pair 0.21.
-- [ ] **2b + 2c. Enroll and tune.** Tool is built; just run it once photos exist:
+- [ ] **2b + 2c. Enroll and tune.** Primary path is now **in the app** (3d): pick her photos
+      and other children in `EnrollmentView`, review, save. The CLI below does the same thing
+      at a desk and prints more detail; use it only if photos are on the Mac:
       ```
       swift run --package-path snapcount/SnapCountCore snapcount-enroll
       ```
@@ -188,11 +200,12 @@ swift test  --package-path snapcount/SnapCountCore
       Photo guidance lives in `snapcount/docs/enrollment-photos.md`. Short version: 15-30 of
       her, 30+ of **other children her age** (never her, and not adults).
 
-**Blocked on:** user providing photos in `snapcount/ReferencePhotos/{daughter,negatives}/`.
+**Blocked on:** the user picking photos on the phone (or, for the CLI, putting them in
+`snapcount/ReferencePhotos/{daughter,negatives}/`). The acceptance bar is the same either way.
 
 ---
 
-### Phase 3: iOS app shell  [3a-3c DONE; 3d NEXT]
+### Phase 3: iOS app shell  [3a-3d DONE; 3e NEXT]
 
 - [x] **3a. App target.** `snapcount/project.yml` (XcodeGen): iOS 18, Swift 6 strict
       concurrency, bundle ID `com.akpersad.snapcount`, `Secrets.xcconfig` as the config file.
@@ -203,8 +216,15 @@ swift test  --package-path snapcount/SnapCountCore
       Imported but not yet called; `Wearables.configure()` is Phase 5a.
 - [x] **3c. Full Info.plist** with both nested opt-outs. Verified in the built bundle, and
       the app launches past `PrivacyChecks` in the simulator.
-- [ ] **3d. Enrollment UI** - pick photos, show the computed reference, allow re-enrollment.
-      Must also get a tuned threshold onto the phone; see open question 8.
+- [x] **3d. Enrollment UI.** `EnrollmentView` + `EnrollmentFlow`: two `PhotosPicker`s (her
+      photos, other children), each photo decoded, embedded, and dropped one at a time. Tuning
+      runs on the phone via `EnrollmentEvaluator` (shared with the CLI, leave-one-out). The
+      result screen shows the threshold, usable counts, and the 112 px crops of her least
+      typical photos and the closest strangers, so a sibling picked as "largest face" is
+      visible. Save, start over, delete. `AppModel` holds the model and enrollment app-wide and
+      rejects an enrollment made with a different model identifier.
+      *Built and launched in the simulator; the picker flow has not been tapped through yet.
+      First real run should be on the phone with real photos.*
 - [ ] **3e. Review screen** - list today's photos with scores, allow user override. Surface
       `DailyTally.uncertain()` first.
 
@@ -251,10 +271,11 @@ library.
 - [ ] Opt-outs confirmed by proxy on a real device (covered by the egress check below)
 - [ ] Proxy a full capture session, confirm **zero unexpected egress**
 - [ ] Confirm enrollment data excluded from backup
-- [ ] Delete reference photos after enrollment is verified
+- [ ] If the CLI was used, delete `ReferencePhotos/` after enrollment is verified (in-app
+      enrollment reads the user's own library through the picker and copies nothing)
 - [ ] **Airplane-mode end-to-end test** (proves both the privacy claim and sea readiness)
 - [ ] Measure battery with the stream running
-- [ ] Confirm Meta AI app is on V282
+- [x] Meta AI app clears the V282 floor (289.0.0.21.157, 2026-09-22). Recheck after any update
 
 ---
 
@@ -267,7 +288,7 @@ library.
 | 6 | ~~AdaFace feature names and normalization?~~ **RESOLVED.** `face_image` (BGR) to `embedding`; [-1, 1] normalization is inside the graph. See 2a. | Done | none |
 | 7 | Pretrained-weight licensing. The AdaFace repo is MIT, but the weights derive from datasets with research-use restrictions. | Fine for a personal, undistributed app. Needs a real answer before any release. Distribution is closed during the preview anyway. | Distribution only |
 | 3 | Does photo capture require a **started** stream? The API does require a `Stream` (capture is `stream.capturePhoto`), but whether `stream.start()` must be running is untested. | Test on device in 5c. Determines whether all-day capture is battery-viable. | Phase 5c, battery item in 7 |
-| 8 | How does the tuned threshold reach the phone? `snapcount-enroll` runs on the Mac against `ReferencePhotos/`; the app enrolls from the photo picker. | Options: (a) app also takes a negatives set and runs `ThresholdTuner` itself, (b) copy the CLI's threshold into the app by hand. (a) is self-contained; (b) is faster. Decide in 3d. | Phase 3d |
+| 8 | ~~How does the tuned threshold reach the phone?~~ **RESOLVED: (a).** The app takes a negatives set and tunes on-device with the same `EnrollmentEvaluator` the CLI uses. No Mac or file transfer needed. | Done | none |
 | 4 | Are raw swipe/pinch events exposed, or only `Button` taps? | Button taps are sufficient, so this is informational. | none |
 | 5 | Is text input available on device? | Not needed by this app. | none |
 

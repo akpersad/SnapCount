@@ -1,6 +1,6 @@
 # Device Access Toolkit (Native)
 
-> **Partly superseded (2026-09-22).** Two corrections below, verified against the 0.9 API
+> **Partly superseded (2026-09-22).** Three corrections below, verified against the 0.9 API
 > reference and the SDK repo's `AGENTS.md`. Current detail lives in
 > `../snapcount/research/dat-api-findings.md` and `../snapcount/docs/info-plist.md`.
 >

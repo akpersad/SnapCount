@@ -38,7 +38,8 @@ is invisible, and it removes all latency pressure from the camera pipeline.
 | Face identity | **AdaFace IR-18** via Core ML | No Apple identity API exists; feature prints are too weak for children. AdaFace beats ArcFace on mixed-quality images, which is what candid shots of a moving child are. |
 | Glasses HUD | Text and icons only, no images | `Image` loads from URL; avoiding it keeps everything local |
 | Meta telemetry | Off | `MWDAT > Analytics > OptOut` and `MWDAT > CrashReporting > OptOut`, enforced at launch |
-| Photo storage | App container, excluded from backup | Keeps biometric data out of iCloud |
+| Face data storage | App container, excluded from backup | Keeps biometric data out of iCloud |
+| Enrollment | On the phone, from the photo picker, tuned on-device | No Mac or file transfer needed; the CLI shares the same code |
 
 ## Build order
 
@@ -57,8 +58,9 @@ blocked on Meta.
 
 - `SnapCountCore/` - the recognition pipeline, as a Swift package. Builds and tests from the
   command line with no Xcode project, no glasses, and no Developer Center account. Also holds
-  the `snapcount-enroll` CLI.
-- `SnapCount/` - the iOS app (sources, `Info.plist`, assets).
+  the optional `snapcount-enroll` CLI for enrolling from `ReferencePhotos/` at a desk.
+- `SnapCount/` - the iOS app: `AppModel` (model + enrollment state), `EnrollmentView` /
+  `EnrollmentFlow` (pick, analyze, review, save), `PrivacyChecks`, `Info.plist`, assets.
 - `project.yml` - XcodeGen spec. `SnapCount.xcodeproj` is generated from it and gitignored.
 - `Scripts/fetch-model.sh` - downloads the AdaFace model into `Models/` (gitignored).
 - `research/dat-api-findings.md` - the 0.9 API surface, verified 2026-09-22
@@ -89,14 +91,15 @@ non-interactive shells, which silently breaks `cd x && y`. Use absolute paths or
 | `FaceDetector.swift` | Vision detection, quality/size/yaw filtering, landmark alignment |
 | `FaceEmbedder.swift` | Protocol, Vision feature-print fallback, Core ML implementation |
 | `EnrollmentStore.swift` | `EnrolledPerson`, JSON persistence, backup exclusion, `Enroller` |
+| `EnrollmentEvaluator.swift` | Centroid + leave-one-out threshold tuning, shared by app and CLI |
 | `PhotoAnalyzer.swift` | Per-photo orchestration, `DailyTally` |
 | `ThresholdTuner.swift` | Precision-first threshold sweep over labelled data |
 | `AdaFace.swift` | Verified AdaFace IR-18 model contract and loader |
 | `ImageLoading.swift` | EXIF-upright, size-bounded decode for the pipeline |
-| `snapcount-enroll` (executable) | Offline enrollment + leave-one-out threshold tuning |
+| `snapcount-enroll` (executable) | Desk-side enrollment over `ReferencePhotos/`, with a detailed report |
 
-27 tests passing, 3 of which run the real AdaFace model and skip if it is not fetched. The alignment geometry is pinned by six of them, including both roll
-directions and extreme up/downscale, because a silently misaligned crop degrades every
+33 tests passing, 3 of which run the real AdaFace model and skip if it is not fetched. The
+alignment geometry is pinned by six of them, including both roll directions and extreme up/downscale, because a silently misaligned crop degrades every
 embedding without ever failing visibly.
 
 ### Notable implementation decision
@@ -117,8 +120,9 @@ the capture-quality filter has almost certainly dropped the face anyway.
 
 1. **Accuracy on children.** The core technical risk. Less inter-person variation, faces
    change fast. Threshold must be tuned on real data. Bias toward precision.
-2. **Battery.** Photo capture appears to require a running stream. An all-day capture mode
-   may be expensive. Unmeasured.
+2. **Battery.** Photo capture goes through a camera `Stream`; whether the stream must be
+   *started* is untested (WORKPLAN open question 3). If it must, all-day capture may be
+   expensive. Unmeasured.
 3. **Timeline.** Departure is the week of 2026-09-28, on a pre-1.0 SDK. Phases 1-4 are
    phone-only and within reach. Phases 5-6 depend on how cleanly registration goes.
 4. ~~**coremltools vs Python 3.14.**~~ Resolved: a pre-converted model is used, so no Python

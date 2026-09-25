@@ -65,8 +65,8 @@ store the mean embedding (L2-normalized).
 ### Rejected: `VNGenerateImageFeaturePrintRequest`
 
 Zero dependencies and pure Apple, but it is a *general image* similarity model, not a face
-embedding. Distinguishing one child from another child is exactly its weak case. Keeping it
-as a fallback only if the Core ML conversion turns into a time sink.
+embedding. Distinguishing one child from another child is exactly its weak case. Kept in the
+code as `VisionFeaturePrintEmbedder`, the control arm for benchmarking, not for real use.
 
 ### Rejected: Create ML binary classifier
 
@@ -81,7 +81,8 @@ against real data rather than trusting a published number.
 
 Mitigations:
 1. Enroll from recent photos, not old ones.
-2. Tune the threshold on a held-out set of her photos plus photos of other similar-aged kids.
+2. Tune the threshold on her photos scored leave-one-out plus photos of other similar-aged
+   kids (`EnrollmentEvaluator`, run on the phone at enrollment).
 3. Bias toward **precision over recall** when in doubt. An undercount is a mildly wrong
    number. An overcount that fires on someone else's kid is the failure that actually matters.
 4. Build a review screen so mistakes are visible and correctable.
@@ -104,9 +105,9 @@ photo bytes (from glasses or phone)
   -> Vision: detect faces + quality filter
   -> crop + align each face to 112x112
   -> Core ML: 512-d embedding per face
-  -> cosine distance vs enrolled mean
-  -> if any face matches: increment today's count
-  -> persist { photoID, timestamp, matched: Bool, confidence }
+  -> cosine similarity vs enrolled mean
+  -> if best face >= tuned threshold: increment today's count
+  -> persist PhotoRecord { id, source, capturedAt, faceCount, bestSimilarity, matched, userOverride }
   -> push updated count to the glasses HUD
 ```
 

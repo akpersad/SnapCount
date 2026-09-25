@@ -84,7 +84,6 @@ guard FileManager.default.fileExists(atPath: options.model.path) else {
 let embedder = try await AdaFaceIR18.embedder(contentsOf: options.model)
 let detector = FaceDetector()
 let enroller = Enroller(detector: detector, embedder: embedder)
-let analyzer = PhotoAnalyzer(detector: detector, embedder: embedder)
 
 // MARK: Reference photos
 
@@ -107,41 +106,36 @@ for url in targetFiles {
     }
 }
 
-guard let centroid = FaceEmbedding.centroid(of: references.map(\.embedding)) else {
-    fail("No usable faces in any reference photo.")
-}
 if references.count < 10 {
     print("\nwarning: only \(references.count) usable reference faces. Aim for at least 10, "
         + "across varied angles, lighting, and ages from the last year.")
 }
 
-// Leave-one-out: each reference is scored against a centroid built from the others, so the
-// genuine scores reflect how an unseen photo of her would score.
-var genuine: [Scored] = []
-if references.count >= 2 {
-    for (i, held) in references.enumerated() {
-        let others = references.enumerated().filter { $0.offset != i }.map(\.element.embedding)
-        guard let looCentroid = FaceEmbedding.centroid(of: others) else { continue }
-        genuine.append(Scored(file: held.file, score: held.embedding.similarity(to: looCentroid)))
-    }
-}
-
 // MARK: Negatives
-
-let person = EnrolledPerson(
-    id: options.id, displayName: options.displayName,
-    embedding: centroid, enrolledAt: Date(), sampleCount: references.count)
 
 // Every face in a negative photo counts, not just the largest, because in real use any
 // stranger in frame is a chance for a false positive.
-var impostor: [Scored] = []
+var negatives: [(file: String, embedding: FaceEmbedding)] = []
 let negativeFiles = (try? ImageLoading.imageFiles(in: negativesDirectory)) ?? []
 for url in negativeFiles {
     guard let image = ImageLoading.image(at: url) else { continue }
-    for score in try await analyzer.scoreFaces(image: image, against: person) {
-        impostor.append(Scored(file: url.lastPathComponent, score: score))
+    for embedding in try await enroller.allFaceEmbeddings(in: image) {
+        negatives.append((url.lastPathComponent, embedding))
     }
 }
+
+guard let evaluation = EnrollmentEvaluator.evaluate(
+    id: options.id,
+    displayName: options.displayName,
+    references: references.map(\.embedding),
+    negatives: negatives.map(\.embedding),
+    minimumPrecision: options.minimumPrecision
+) else {
+    fail("No usable faces in any reference photo.")
+}
+
+let genuine = zip(references, evaluation.genuineScores).map { Scored(file: $0.file, score: $1) }
+let impostor = zip(negatives, evaluation.impostorScores).map { Scored(file: $0.file, score: $1) }
 
 // MARK: Report and tune
 
@@ -172,34 +166,27 @@ if !impostor.isEmpty {
     }
 }
 
-var tuned = person
 var exitCode: Int32 = 0
-
-if genuine.isEmpty || impostor.isEmpty {
+switch evaluation.outcome {
+case .tuned(let result):
+    print(String(
+        format: "\nThreshold %.2f: precision %.3f, recall %.3f (%d TP, %d FP, %d FN)",
+        result.threshold, result.precision, result.recall,
+        result.truePositives, result.falsePositives, result.falseNegatives))
+case .insufficientData:
     print("\nNot tuned: need at least 2 reference faces and at least 1 face in negatives/. "
         + "Enrollment written without a threshold; the app will use its default.")
     exitCode = 3
-} else {
-    let labelled = genuine.map { LabelledScore(similarity: $0.score, isTarget: true) }
-        + impostor.map { LabelledScore(similarity: $0.score, isTarget: false) }
-    if let result = ThresholdTuner().recommend(
-        from: labelled, minimumPrecision: options.minimumPrecision) {
-        tuned.matchThreshold = result.threshold
-        print(String(
-            format: "\nThreshold %.2f: precision %.3f, recall %.3f (%d TP, %d FP, %d FN)",
-            result.threshold, result.precision, result.recall,
-            result.truePositives, result.falsePositives, result.falseNegatives))
-    } else {
-        print("\nNo threshold reaches precision \(options.minimumPrecision). The reference set is "
-            + "not discriminative enough. Add clearer, more varied photos of her, and check "
-            + "negatives/ does not contain her. Enrollment written without a threshold.")
-        exitCode = 2
-    }
+case .notDiscriminative:
+    print("\nNo threshold reaches precision \(options.minimumPrecision). The reference set is "
+        + "not discriminative enough. Add clearer, more varied photos of her, and check "
+        + "negatives/ does not contain her. Enrollment written without a threshold.")
+    exitCode = 2
 }
 
 try FileManager.default.createDirectory(
     at: options.output.deletingLastPathComponent(), withIntermediateDirectories: true)
 try EnrollmentStore(fileURL: options.output)
-    .save(Enrollment(embedderIdentifier: embedder.identifier, people: [tuned]))
+    .save(Enrollment(embedderIdentifier: embedder.identifier, people: [evaluation.person]))
 print("\nWrote \(options.output.path)")
 exit(exitCode)

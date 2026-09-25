@@ -150,11 +150,24 @@ public struct Enroller: Sendable {
     /// at a time. Scoring a photo against a centroid it helped build inflates the score and
     /// would produce an optimistic threshold.
     public func largestFaceEmbedding(in image: CGImage) async throws -> FaceEmbedding? {
+        try await largestFace(in: image)?.embedding
+    }
+
+    /// The largest face in one image with its embedding, or nil if none survives filtering.
+    /// Keeps the crop so the enrollment screen can show which face was picked.
+    public func largestFace(in image: CGImage) async throws -> EmbeddedFace? {
         let faces = try await detector.detectFaces(in: image)
         guard let largest = faces.max(by: {
             $0.boundingBox.width * $0.boundingBox.height
                 < $1.boundingBox.width * $1.boundingBox.height
         }) else { return nil }
-        return try? await embedder.embed(largest.crop)
+        guard let embedding = try? await embedder.embed(largest.crop) else { return nil }
+        return EmbeddedFace(face: largest, embedding: embedding)
     }
+}
+
+/// A detected face together with its embedding.
+public struct EmbeddedFace: Sendable {
+    public let face: DetectedFace
+    public let embedding: FaceEmbedding
 }

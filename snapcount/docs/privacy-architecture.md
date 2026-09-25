@@ -18,8 +18,8 @@ Not "is Meta evil." The realistic risks are mundane:
 The app makes no outbound connections. This is checkable rather than promised:
 
 ```
-# should return nothing
-grep -rE 'URLSession|Alamofire|\.dataTask|http://|https://' SnapCount/ SnapCountCore/Sources/
+# should return nothing (Swift only: Info.plist's DTD header contains an http:// URL)
+grep -rE --include='*.swift' 'URLSession|Alamofire|\.dataTask|http://|https://' SnapCount/ SnapCountCore/Sources/
 ```
 
 Not yet a build phase. Adding it as a run-script phase would make a future edit that adds
@@ -59,6 +59,10 @@ Charles or a similar proxy before the trip, not after.
 The enrollment set is persisted as L2-normalized 512-float embeddings. Reference photos are
 used to compute those and then discarded.
 
+In the app, photos arrive through `PhotosPicker`, which runs out of process: the app sees only
+the photos the user picks and needs no library permission to enroll. Each is decoded, embedded,
+and dropped. The 112 px face crops on the result screen are memory-only and gone after Save.
+
 An embedding is not trivially reversible to an image. It is still biometric data, so it gets
 the same handling as a photo would.
 
@@ -95,7 +99,7 @@ Do these on land, with good Wi-Fi, before boarding.
 - [ ] Both confirmed silent by proxy on a real device
 - [ ] Proxy the app for one full capture session, confirm zero unexpected egress
 - [ ] Confirm enrollment data is excluded from backup
-- [ ] Confirm reference photos are deleted after enrollment
+- [ ] If the desk CLI was used, confirm `ReferencePhotos/` is emptied after enrollment
 - [ ] Airplane-mode test: the full capture-to-count loop works with no internet
 
 That last one matters twice over. It proves the privacy claim and it proves the app works

@@ -28,6 +28,10 @@ No custom gestures. The entire vocabulary is:
 
 Design has to fit a d-pad plus two buttons. That is the whole input budget.
 
+(That framing comes from Web Apps. On the native path, input reaches the app as `Button` tap
+handlers in the display UI; raw swipe/pinch events are unverified. See
+`../snapcount/research/dat-api-findings.md`.)
+
 ## One registered app at a time (native path)
 
 Only one third-party app can hold a Developer Mode registration simultaneously. Registering a
