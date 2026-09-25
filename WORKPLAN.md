@@ -4,20 +4,13 @@
 immediately. Read this first; it should make re-reading the research files unnecessary for
 most tasks.
 
-Last updated: 2026-09-24 (Phase 4 built: PhotoKit ingest with persisted records and live count)
+Last updated: 2026-09-24 (enrolled and tuned on the phone; Phase 4 verified on device)
 
-**Next session starts here (2026-09-24):** The first physical-iPhone build **succeeded**.
-Phase 4 is built and verified in the simulator up to face detection, which the simulator
-cannot run (Vision `DetectFaceCaptureQualityRequest` fails there with "Could not create
-inference context"; it works on the Mac and on device). **Next: Phase 5** (5a registration
-needs internet, do it on land), then **6**, then Phase 7 airplane-mode and egress checks.
-3e stays minimal.
-
-**Enrollment state (from a CLI dry run on 2026-09-24):** 11 photos of her in
-`ReferencePhotos/daughter/`, 0 negatives, so no threshold could be tuned. `IMG_7172.HEIC`
-scores **0.202** leave-one-out against a median of 0.746, so its largest face is almost certainly
-not her. Replace it. Enrollment is still blocked on 15+ good photos of her and 30+ of other
-children, ideally picked in the app.
+**Next session starts here (2026-09-24):** Enrollment is done on the phone and tuned (the
+default-cutoff note is gone; the results screen showed nothing suspicious). The live library
+count works on device. Mac copies of her photos and the CLI's test `enrollment.json` were
+deleted. **Next: Phase 5** (5a registration needs internet, do it on land before 2026-09-28),
+then **6**, then the Phase 7 airplane-mode and egress checks. 3e stays minimal.
 
 ---
 
@@ -54,9 +47,9 @@ Test every feature in airplane mode.
 | Recognition core (`SnapCountCore`) | **Done, 38 tests passing** |
 | Core ML embedding model | **Done.** AdaFace IR-18 fetched, checksum pinned, same-vs-different check passes |
 | Enrollment + tuning CLI | **Done.** `snapcount-enroll`, waiting on photos. Optional now that the app tunes on-device |
-| Enrollment photos | 11 of her on the Mac (one bad, see note above), 0 negatives. Not yet enough to tune |
+| Enrollment | **Done on the phone, tuned** (2026-09-24). Mac copies deleted |
 | Xcode app target | **Done.** Generated from `snapcount/project.yml`; builds and runs in the simulator. First physical-iPhone build succeeded (2026-09-24) |
-| PhotoKit ingest (Phase 4) | **Done.** Live count on the main screen; face detection untestable in the simulator |
+| PhotoKit ingest (Phase 4) | **Done, verified on device.** Live count updates within seconds of a new photo |
 | DAT integration | Not started |
 | Glasses HUD | Not started |
 | Git remote | `git@github.com-personal:akpersad/SnapCount.git`, pushed |
@@ -185,7 +178,7 @@ swift test  --package-path snapcount/SnapCountCore
 
 ---
 
-### Phase 2: Model and enrollment  [2a DONE; 2b/2c tooling done in app and CLI, waiting on photos]
+### Phase 2: Model and enrollment  [DONE]
 
 - [x] **2a. Fetch and wire the AdaFace IR-18 Core ML model.** Done. Checksum pinned in
       `fetch-model.sh`. Contract, read from the compiled graph (not guessed):
@@ -194,7 +187,7 @@ swift test  --package-path snapcount/SnapCountCore
       Encoded in `AdaFaceIR18`. Sanity check on public-domain official portraits
       (`snapcount/Models/SanityFaces/`, gitignored): same-person 0.67-0.72, worst
       different-person pair 0.21.
-- [ ] **2b + 2c. Enroll and tune.** Primary path is now **in the app** (3d): pick her photos
+- [x] **2b + 2c. Enroll and tune.** Done in the app on 2026-09-24. Primary path is now **in the app** (3d): pick her photos
       and other children in `EnrollmentView`, review, save. The CLI below does the same thing
       at a desk and prints more detail; use it only if photos are on the Mac:
       ```
@@ -211,8 +204,7 @@ swift test  --package-path snapcount/SnapCountCore
       Photo guidance lives in `snapcount/docs/enrollment-photos.md`. Short version: 15-30 of
       her, 30+ of **other children her age** (never her, and not adults).
 
-**Blocked on:** the user picking photos on the phone (or, for the CLI, putting them in
-`snapcount/ReferencePhotos/{daughter,negatives}/`). The acceptance bar is the same either way.
+Re-enroll the same way (in the app) if the count starts missing her or catching other kids.
 
 ---
 
@@ -244,7 +236,7 @@ library.
 
 ---
 
-### Phase 4: PhotoKit ingest  [DONE, pending on-device check]
+### Phase 4: PhotoKit ingest  [DONE]
 
 - [x] **4a.** `SnapCount/LibraryIngest.swift`. Fetches today's still photos (screenshots
       excluded), plans with `IngestPlan` (new assets oldest first; deleted library photos drop
@@ -259,8 +251,8 @@ library.
       `BGProcessingTask`: the count only needs to be right when someone looks.
       Photo access is asked for only from an explicit tap.
 
-*Acceptance:* count reflects phone photos within a minute of taking them. **Untested on
-device**: take a photo with the app open and watch the count.
+*Acceptance:* count reflects phone photos within a minute of taking them. **Met on device
+2026-09-24**: count rose within seconds for a photo of her; only the total rose for one without.
 
 ---
 
@@ -293,7 +285,7 @@ device**: take a photo with the app open and watch the count.
 - [ ] Opt-outs confirmed by proxy on a real device (covered by the egress check below)
 - [ ] Proxy a full capture session, confirm **zero unexpected egress**
 - [ ] Confirm enrollment data and `records.json` excluded from backup
-- [ ] If the CLI was used, delete `ReferencePhotos/` after enrollment is verified (in-app
+- [x] If the CLI was used, delete `ReferencePhotos/` after enrollment is verified (done 2026-09-24) (in-app
       enrollment reads the user's own library through the picker and copies nothing)
 - [ ] **Airplane-mode end-to-end test** (proves both the privacy claim and sea readiness)
 - [ ] Measure battery with the stream running
