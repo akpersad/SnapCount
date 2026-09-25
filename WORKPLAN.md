@@ -226,8 +226,7 @@ Re-enroll the same way (in the app) if the count starts missing her or catching 
       typical photos and the closest strangers, so a sibling picked as "largest face" is
       visible. Save, start over, delete. `AppModel` holds the model and enrollment app-wide and
       rejects an enrollment made with a different model identifier.
-      *Built and launched in the simulator; the picker flow has not been tapped through yet.
-      First real run should be on the phone with real photos.*
+      *Used on the phone with real photos on 2026-09-24: enrolled and tuned.*
 - [ ] **3e. Review screen** - list today's photos with scores, allow user override. Surface
       `DailyTally.uncertain()` first.
 
