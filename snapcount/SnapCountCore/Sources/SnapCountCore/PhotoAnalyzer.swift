@@ -17,10 +17,13 @@ public struct PhotoAnalyzer: Sendable {
     /// number, whereas a false positive means the app counted somebody else's child.
     public var matchThreshold: Float
 
+    /// Used only until the enrollment has been tuned.
+    public static let defaultMatchThreshold: Float = 0.65
+
     public init(
         detector: FaceDetector = FaceDetector(),
         embedder: any FaceEmbedder,
-        matchThreshold: Float = 0.65
+        matchThreshold: Float = PhotoAnalyzer.defaultMatchThreshold
     ) {
         self.detector = detector
         self.embedder = embedder

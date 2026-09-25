@@ -77,7 +77,7 @@ values.isExcludedFromBackup = true
 try url.setResourceValues(values)
 ```
 
-(As implemented in `EnrollmentStore`. `setResourceValues` mutates the URL, so it must be a `var`.)
+(As implemented in `EnrollmentStore` and `PhotoRecordStore` (`records.json`). `setResourceValues` mutates the URL, so it must be a `var`.)
 
 Prevents the biometric template syncing to iCloud.
 
@@ -86,7 +86,13 @@ Prevents the biometric template syncing to iCloud.
 If captured photos are saved to the system Photos library they inherit iCloud Photos sync.
 Default to storing them in the app container. Make library export an explicit, per-photo action.
 
-### 6. Core ML stays on-device
+### 6. Library reads never touch the network
+
+`LibraryIngest` requests photo bytes with `PHImageRequestOptions.isNetworkAccessAllowed = false`.
+With iCloud Photos on, allowing network would silently download originals. Photos that exist
+only in iCloud are skipped and reported on the main screen, never fetched.
+
+### 7. Core ML stays on-device
 
 Core ML inference is local by construction. Set `MLModelConfiguration.computeUnits` explicitly
 and never use any cloud-backed model API.
@@ -98,7 +104,7 @@ Do these on land, with good Wi-Fi, before boarding.
 - [x] Analytics and crash reporting opt-outs set (nested), enforced at launch
 - [ ] Both confirmed silent by proxy on a real device
 - [ ] Proxy the app for one full capture session, confirm zero unexpected egress
-- [ ] Confirm enrollment data is excluded from backup
+- [ ] Confirm enrollment data and `records.json` are excluded from backup
 - [ ] If the desk CLI was used, confirm `ReferencePhotos/` is emptied after enrollment
 - [ ] Airplane-mode test: the full capture-to-count loop works with no internet
 

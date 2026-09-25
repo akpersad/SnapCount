@@ -4,14 +4,20 @@
 immediately. Read this first; it should make re-reading the research files unnecessary for
 most tasks.
 
-Last updated: 2026-09-24 (Phase 3d built: on-device enrollment and tuning from the photo picker; open question 8 resolved)
+Last updated: 2026-09-24 (Phase 4 built: PhotoKit ingest with persisted records and live count)
 
-**Next session starts here (2026-09-24):** Phase 3d is built but not yet exercised on a real
-iPhone; the user is doing the first device build now. Suggested order from here, given the
-departure date: **Phase 4** (PhotoKit ingest, since most cruise photos are phone photos), then
-**5** and **6**, with **3e** kept minimal. 5a registration needs internet, so it must happen
-on land, followed by the Phase 7 airplane-mode and egress checks. Phases 3d, the doc pass, and
-this note are uncommitted unless git says otherwise.
+**Next session starts here (2026-09-24):** The first physical-iPhone build **succeeded**.
+Phase 4 is built and verified in the simulator up to face detection, which the simulator
+cannot run (Vision `DetectFaceCaptureQualityRequest` fails there with "Could not create
+inference context"; it works on the Mac and on device). **Next: Phase 5** (5a registration
+needs internet, do it on land), then **6**, then Phase 7 airplane-mode and egress checks.
+3e stays minimal.
+
+**Enrollment state (from a CLI dry run on 2026-09-24):** 11 photos of her in
+`ReferencePhotos/daughter/`, 0 negatives, so no threshold could be tuned. `IMG_7172.HEIC`
+scores **0.202** leave-one-out against a median of 0.746, so its largest face is almost certainly
+not her. Replace it. Enrollment is still blocked on 15+ good photos of her and 30+ of other
+children, ideally picked in the app.
 
 ---
 
@@ -45,11 +51,12 @@ Test every feature in airplane mode.
 | Meta AI app version | **289.0.0.21.157** - clears the V282 floor |
 | Wearables Developer Center org | Done |
 | Wearables Developer Center project | **Done.** MetaAppID + ClientToken in `Secrets.xcconfig` |
-| Recognition core (`SnapCountCore`) | **Done, 33 tests passing** |
+| Recognition core (`SnapCountCore`) | **Done, 38 tests passing** |
 | Core ML embedding model | **Done.** AdaFace IR-18 fetched, checksum pinned, same-vs-different check passes |
 | Enrollment + tuning CLI | **Done.** `snapcount-enroll`, waiting on photos. Optional now that the app tunes on-device |
-| Enrollment photos | Not provided. Can now be picked directly on the phone (3d) |
-| Xcode app target | **Done.** Generated from `snapcount/project.yml`; builds and runs in the simulator. First physical-iPhone build in progress (2026-09-24) |
+| Enrollment photos | 11 of her on the Mac (one bad, see note above), 0 negatives. Not yet enough to tune |
+| Xcode app target | **Done.** Generated from `snapcount/project.yml`; builds and runs in the simulator. First physical-iPhone build succeeded (2026-09-24) |
+| PhotoKit ingest (Phase 4) | **Done.** Live count on the main screen; face detection untestable in the simulator |
 | DAT integration | Not started |
 | Glasses HUD | Not started |
 | Git remote | `git@github.com-personal:akpersad/SnapCount.git`, pushed |
@@ -77,6 +84,9 @@ Recorded so they are not re-litigated. Each has a reason; revisit only if the re
 | XcodeGen; `.xcodeproj` generated and gitignored | A readable `project.yml` diffs and reviews cleanly, and a hand-edited `.pbxproj` is where unreviewable config drift hides. |
 | Privacy config **fails closed** at launch | The opt-out keys are easy to get subtly wrong (this project already did once). A crash at launch beats an app that quietly reports home. |
 | Tuner picks the **middle** of the best-recall threshold range | The low edge hugs the worst impostor in a small tuning set, so the first unseen child scoring slightly higher gets counted. |
+| Library ingest **never downloads from iCloud** (`isNetworkAccessAllowed = false`) | Downloading originals is network traffic, metered at sea. Photos taken on the phone that day are always local; cloud-only ones are counted and reported, not fetched. |
+| A photo that fails analysis is **not recorded**, and is retried next scan | Recording it as "0 faces" would let one transient Vision error permanently drop a photo of her. |
+| Record ID is the **dedupe key** across sources | Library records use `PHAsset.localIdentifier`. If 5d saves a glasses capture to Photos, its record must take the new asset's `localIdentifier` so ingest skips it. |
 | Enrollment and tuning run **on the phone**, from `PhotosPicker` | No Mac, no file transfer, re-enrollable at sea. The CLI shares the same `EnrollmentEvaluator`, so the two cannot disagree. (Open question 8.) |
 
 ---
@@ -162,6 +172,7 @@ Xcode project, no glasses, and no Developer Center account. **33 tests passing.*
 | `EnrollmentStore.swift` | `EnrolledPerson`, JSON persistence, backup exclusion, `Enroller`, `EmbeddedFace` |
 | `EnrollmentEvaluator.swift` | Centroid + leave-one-out tuning over embeddings. Shared by the app and the CLI |
 | `PhotoAnalyzer.swift` | Per-photo orchestration, `DailyTally` |
+| `PhotoRecordStore.swift` | `RecordLog` persistence (tied to the enrollment fingerprint, 30-day retention, no backup), `IngestPlan` |
 | `ThresholdTuner.swift` | Precision-first threshold sweep, midpoint of the best-recall plateau |
 | `AdaFace.swift` | Verified model contract (`AdaFaceIR18`), compiles `.mlpackage` on the fly |
 | `ImageLoading.swift` | EXIF-upright, 2048 px-bounded decode. Use it for PhotoKit data too |
@@ -233,12 +244,23 @@ library.
 
 ---
 
-### Phase 4: PhotoKit ingest
+### Phase 4: PhotoKit ingest  [DONE, pending on-device check]
 
-- [ ] **4a.** Enumerate today's photos, run the pipeline, dedupe against glasses captures.
-- [ ] **4b.** Incremental background processing with progress.
+- [x] **4a.** `SnapCount/LibraryIngest.swift`. Fetches today's still photos (screenshots
+      excluded), plans with `IngestPlan` (new assets oldest first; deleted library photos drop
+      out; glasses records never touched), runs each through `PhotoAnalyzer`, persists to
+      `records.json` next to the enrollment. Re-enrolling or deleting enrollment discards
+      records. Dedupe with glasses is by record ID (see section 3).
+- [x] **4b.** Incremental: only photos without a record are analyzed. Rescans on
+      `PHPhotoLibraryChangeObserver`, on return to foreground, and on
+      `significantTimeChangeNotification` (midnight, time zone change at sea). A scan in
+      progress finishes under `beginBackgroundTask` if the app is backgrounded. Progress and
+      the count ("N photos of her, out of M taken today") are on the main screen. No
+      `BGProcessingTask`: the count only needs to be right when someone looks.
+      Photo access is asked for only from an explicit tap.
 
-*Acceptance:* count reflects phone photos within a minute of taking them.
+*Acceptance:* count reflects phone photos within a minute of taking them. **Untested on
+device**: take a photo with the app open and watch the count.
 
 ---
 
@@ -270,7 +292,7 @@ library.
 - [x] Analytics and crash reporting opt-outs in the plist, enforced at launch by `PrivacyChecks`
 - [ ] Opt-outs confirmed by proxy on a real device (covered by the egress check below)
 - [ ] Proxy a full capture session, confirm **zero unexpected egress**
-- [ ] Confirm enrollment data excluded from backup
+- [ ] Confirm enrollment data and `records.json` excluded from backup
 - [ ] If the CLI was used, delete `ReferencePhotos/` after enrollment is verified (in-app
       enrollment reads the user's own library through the picker and copies nothing)
 - [ ] **Airplane-mode end-to-end test** (proves both the privacy claim and sea readiness)

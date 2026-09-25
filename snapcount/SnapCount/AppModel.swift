@@ -2,8 +2,8 @@ import Foundation
 import Observation
 import SnapCountCore
 
-/// App-wide state: the loaded model and the saved enrollment. Screens read from here rather
-/// than each loading their own copy of a 50 MB model.
+/// App-wide state: the loaded model, the saved enrollment, and today's count. Screens read
+/// from here rather than each loading their own copy of a 50 MB model.
 @MainActor
 @Observable
 final class AppModel {
@@ -12,6 +12,8 @@ final class AppModel {
 
     private(set) var enrollment: Enrollment?
     private(set) var enrollmentStatus: Status = .checking
+
+    let library = LibraryIngest()
 
     /// The one person being counted, if enrollment is valid for the current model.
     var person: EnrolledPerson? {
@@ -41,6 +43,8 @@ final class AppModel {
 
     func deleteEnrollment() throws {
         try Self.store().deleteAll()
+        // Records say which photos show her. They go with the enrollment.
+        library.clearRecords()
         reloadEnrollment()
     }
 
@@ -50,6 +54,7 @@ final class AppModel {
         } catch {
             enrollment = nil
             enrollmentStatus = .problem(error.localizedDescription)
+            library.configure(embedder: embedder, person: nil)
             return
         }
 
@@ -62,6 +67,7 @@ final class AppModel {
         } else {
             enrollmentStatus = .problem("Not set up yet")
         }
+        library.configure(embedder: embedder, person: person)
     }
 
     private static func store() throws -> EnrollmentStore {
